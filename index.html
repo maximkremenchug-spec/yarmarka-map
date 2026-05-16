@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ярмарка — Домодедовский рынок, Ореховый бульвар</title>
+<title>План</title>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0d1b2a;color:#e0e6f0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -143,7 +143,7 @@
 <body class="tool-pointer">
 
 <header>
-  <h1>🏪 Домодедовский рынок · Ореховый бульвар</h1>
+  <h1>🏪 План</h1>
   <div class="header-stats">
     <span>Прилавков: <span class="val" id="st-total">0</span></span>
     <span>Проходов: <span class="val" id="st-passages">0</span></span>
@@ -532,25 +532,16 @@ function buildSVG(){
   svg.appendChild(el('rect',{x:710,y:0,width:90,height:950,fill:'#0a1628'}));
   svg.appendChild(el('rect',{x:90,y:170,width:620,height:710,fill:'#0c1d30'}));
 
-  // подписи улиц
-  const stStyle={'font-size':12,fill:'#5a7a98','font-family':'sans-serif','font-style':'italic','text-anchor':'middle','font-weight':600};
-  svg.appendChild(el('text',{...stStyle,x:400,y:80},'ОРЕХОВЫЙ БУЛЬВАР'));
-  svg.appendChild(el('text',{...stStyle,x:400,y:96,'font-size':10,fill:'#3a6080','font-weight':400},'(север)'));
+  // границы плота (без подписей улиц)
   svg.appendChild(el('line',{x1:0,y1:135,x2:800,y2:135,stroke:'#1a3a5f','stroke-width':1.5,'stroke-dasharray':'10,6'}));
-  svg.appendChild(el('circle',{cx:370,cy:115,r:8,fill:'#16213e',stroke:'#3a6080','stroke-width':1}));
-  svg.appendChild(el('text',{x:370,y:119,'text-anchor':'middle','font-size':10,fill:'#7a9ab5','font-family':'sans-serif'},'🚌'));
-  svg.appendChild(el('text',{x:385,y:118,'font-size':9,fill:'#5a7a98','font-family':'sans-serif'},'Мострансавто'));
-  svg.appendChild(el('text',{...stStyle,x:760,y:500,transform:'rotate(90,760,500)'},'УЛ. ГЕНЕРАЛА БЕЛОВА (восток)'));
   svg.appendChild(el('line',{x1:725,y1:170,x2:725,y2:880,stroke:'#1a3a5f','stroke-width':1.5,'stroke-dasharray':'10,6'}));
-  svg.appendChild(el('text',{...stStyle,x:40,y:500,transform:'rotate(-90,40,500)'},'ТЦ «ДОМОДЕДОВСКИЙ» (запад)'));
   svg.appendChild(el('line',{x1:75,y1:170,x2:75,y2:880,stroke:'#1a3a5f','stroke-width':1.5,'stroke-dasharray':'10,6'}));
-  svg.appendChild(el('text',{...stStyle,x:400,y:912},'парковка / выезд (юг)'));
   svg.appendChild(el('line',{x1:0,y1:895,x2:800,y2:895,stroke:'#1a3a5f','stroke-width':1.5,'stroke-dasharray':'10,6'}));
 
   // входы
-  drawGateArrow(svg, 250, 165, '↓', 'вход с Орехового б-ра');
-  drawGateArrow(svg, 720, 350, '←', 'вход с Генерала Белова');
-  drawGateArrow(svg, 300, 885, '↑', 'вход с юга / парковки');
+  drawGateArrow(svg, 250, 165, '↓', 'вход');
+  drawGateArrow(svg, 720, 350, '←', 'вход');
+  drawGateArrow(svg, 300, 885, '↑', 'вход');
 
   // здания (контуры)
   for(const b of BUILDINGS) renderBuilding(svg,b);
