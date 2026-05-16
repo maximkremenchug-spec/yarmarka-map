@@ -63,7 +63,7 @@
   .flow-line{cursor:pointer;fill:none;transition:opacity .15s}
   .flow-line:hover{opacity:1!important;filter:brightness(1.2)}
   .flow-line.edit-selected{filter:drop-shadow(0 0 5px #ffe600)}
-  .flow-label{font-size:11px;font-weight:bold;fill:#fff;stroke:#0a1628;stroke-width:3;paint-order:stroke fill;pointer-events:none}
+  .flow-label{font-size:10px;font-weight:500;fill:#cfd8e3;stroke:#0a1628;stroke-width:2.5;paint-order:stroke fill;pointer-events:none;letter-spacing:.3px}
 
   .vertex-handle{fill:#ffe600;stroke:#000;stroke-width:1.5;cursor:move;transition:r .1s}
   .vertex-handle:hover{fill:#fff;r:8}
@@ -397,13 +397,13 @@ function getNextStallId(prefix){
 // стиль потоковой линии в зависимости от количества чел/ч
 function flowStyle(count){
   const c=+count||0;
-  const w=Math.min(14, 1.5+c/110);
+  const w=Math.min(5, 0.8+c/350);   // тоньше: 1 чел → 0.8px, 1500 чел → ~5px макс
   let color;
-  if(c<200)        color='#3498db';   // синий — низкая
-  else if(c<500)   color='#1abc9c';   // бирюза
-  else if(c<1000)  color='#f1c40f';   // жёлто-оранжевая
-  else if(c<2000)  color='#e67e22';   // оранжевая
-  else             color='#e74c3c';   // красная
+  if(c<200)        color='#3498db';
+  else if(c<500)   color='#1abc9c';
+  else if(c<1000)  color='#f1c40f';
+  else if(c<2000)  color='#e67e22';
+  else             color='#e74c3c';
   return {w,color};
 }
 
@@ -751,8 +751,10 @@ function renderFlow(svg, f){
   svg.appendChild(el('path',{
     id:`flow-${f.id}`,
     class:'flow-line'+(sel?' edit-selected':''),
-    d, stroke:color,'stroke-width':w,'stroke-linejoin':'round','stroke-linecap':'round',
-    opacity:0.72,
+    d, stroke:color,'stroke-width':w,
+    'stroke-linejoin':'round','stroke-linecap':'round',
+    'stroke-dasharray': Math.max(4, w*2.2)+','+Math.max(3, w*1.6),
+    opacity:0.85,
     'data-id':f.id,'data-kind':'flow',
   }));
   // стрелка на конце
