@@ -31,6 +31,18 @@
   .progress-bar{height:2px;background:#1e3a5f;flex-shrink:0}
   .progress-fill{height:100%;background:linear-gradient(90deg,#e94560,#3498db);transition:width .4s}
 
+  /* floor tabs */
+  .floor-tabs{background:#0a1628;border-bottom:1px solid #1e3a5f;padding:6px 20px;display:flex;align-items:center;gap:5px;flex-shrink:0;overflow-x:auto;min-height:38px}
+  .floor-tab{padding:5px 12px;border:1px solid #1e3a5f;border-radius:6px;font-size:12px;cursor:pointer;background:#111f33;color:#8ab0cc;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all .12s}
+  .floor-tab:hover{background:#1a3050;color:#fff}
+  .floor-tab.active{background:#e94560;color:#fff;border-color:#e94560}
+  .floor-tab .ft-cnt{font-size:10px;opacity:.7}
+  .floor-tab .ft-act{width:18px;height:18px;border:none;background:rgba(0,0,0,.25);color:#fff;border-radius:3px;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0}
+  .floor-tab.active .ft-act{display:flex}
+  .floor-tab .ft-act:hover{background:rgba(0,0,0,.55)}
+  .floor-add{padding:5px 12px;border:1px dashed #2a5a80;border-radius:6px;background:transparent;color:#5a7a98;font-size:12px;cursor:pointer}
+  .floor-add:hover{color:#fff;border-color:#fff}
+
   .main{flex:1;display:flex;overflow:hidden;position:relative}
   .map-wrap{flex:1;overflow:auto;background:#0a1628;display:flex;align-items:flex-start;justify-content:center;padding:20px}
   svg.ymap{display:block;filter:drop-shadow(0 6px 30px rgba(0,0,0,.6));user-select:none}
@@ -48,6 +60,11 @@
   .passage-rect.edit-selected{stroke:#ffe600;stroke-width:2}
   .passage-label{font-size:10px;fill:#5a7a98;font-style:italic;font-family:sans-serif;pointer-events:none;text-anchor:middle}
 
+  .flow-line{cursor:pointer;fill:none;transition:opacity .15s}
+  .flow-line:hover{opacity:1!important;filter:brightness(1.2)}
+  .flow-line.edit-selected{filter:drop-shadow(0 0 5px #ffe600)}
+  .flow-label{font-size:11px;font-weight:bold;fill:#fff;stroke:#0a1628;stroke-width:3;paint-order:stroke fill;pointer-events:none}
+
   .vertex-handle{fill:#ffe600;stroke:#000;stroke-width:1.5;cursor:move;transition:r .1s}
   .vertex-handle:hover{fill:#fff;r:8}
   .resize-handle{fill:#ffe600;stroke:#000;stroke-width:1;cursor:nwse-resize}
@@ -57,23 +74,23 @@
   body.editing.tool-pointer svg.ymap{cursor:default}
   body.editing.tool-stall svg.ymap{cursor:copy}
   body.editing.tool-passage svg.ymap{cursor:crosshair}
+  body.editing.tool-flow svg.ymap{cursor:crosshair}
   body.editing.tool-delete svg.ymap{cursor:not-allowed}
   body.editing.tool-vertex svg.ymap{cursor:default}
 
-  body.editing.tool-stall .stall-rect,
-  body.editing.tool-passage .stall-rect,
-  body.editing.tool-passage .passage-rect{pointer-events:none;opacity:.55}
+  body.editing.tool-stall .stall-rect,body.editing.tool-passage .stall-rect,body.editing.tool-flow .stall-rect{pointer-events:none;opacity:.55}
+  body.editing.tool-passage .passage-rect,body.editing.tool-flow .passage-rect{pointer-events:none;opacity:.55}
 
   /* tool palette */
-  .tool-palette{position:fixed;top:96px;left:24px;background:#111f33;border:1px solid #2a5a8a;border-radius:10px;padding:6px;display:none;flex-direction:column;gap:4px;z-index:5000;box-shadow:0 8px 30px rgba(0,0,0,.7)}
+  .tool-palette{position:fixed;top:140px;left:24px;background:#111f33;border:1px solid #2a5a8a;border-radius:10px;padding:6px;display:none;flex-direction:column;gap:4px;z-index:5000;box-shadow:0 8px 30px rgba(0,0,0,.7)}
   body.editing .tool-palette{display:flex}
-  .tool-btn{width:46px;height:46px;border:1px solid #1e3a5f;background:#0a1628;color:#8ab0cc;border-radius:7px;cursor:pointer;font-size:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:all .12s}
+  .tool-btn{width:48px;height:48px;border:1px solid #1e3a5f;background:#0a1628;color:#8ab0cc;border-radius:7px;cursor:pointer;font-size:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:all .12s}
   .tool-btn:hover{background:#1a3050;color:#fff}
   .tool-btn.active{background:#e94560;color:#fff;border-color:#e94560}
   .tool-btn .lbl{font-size:7px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
   .tool-divider{height:1px;background:#1e3a5f;margin:2px 0}
 
-  /* sidebar (форма арендатора) */
+  /* sidebar */
   .sidebar{width:0;overflow:hidden;background:#111f33;border-left:1px solid #1e3a5f;display:flex;flex-direction:column;transition:width .2s ease;flex-shrink:0}
   .sidebar.open{width:340px}
   .sb-header{padding:14px 16px;border-bottom:1px solid #1e3a5f;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
@@ -106,7 +123,7 @@
   .btn-reset:hover{color:#e74c3c;border-color:#e74c3c}
 
   /* edit-panel */
-  .edit-panel{position:fixed;top:96px;right:20px;width:360px;max-height:calc(100vh - 116px);background:#111f33;border:1px solid #2a5a8a;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.7);display:none;flex-direction:column;z-index:5000;overflow:hidden}
+  .edit-panel{position:fixed;top:140px;right:20px;width:360px;max-height:calc(100vh - 160px);background:#111f33;border:1px solid #2a5a8a;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.7);display:none;flex-direction:column;z-index:5000;overflow:hidden}
   .edit-panel.open{display:flex}
   .ep-header{padding:12px 16px;border-bottom:1px solid #1e3a5f;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:#0e1f33}
   .ep-title{font-size:13px;font-weight:700;color:#e94560}
@@ -134,7 +151,7 @@
   .tt-detail{color:#7a9ab5;margin-top:2px;font-size:11px}
 
   /* info badge */
-  .info-badge{position:fixed;bottom:16px;left:20px;background:rgba(17,31,51,.95);border:1px solid #2a5a8a;border-radius:8px;padding:8px 14px;font-size:11px;color:#8ab0cc;z-index:4000;display:none;line-height:1.5}
+  .info-badge{position:fixed;bottom:16px;left:20px;background:rgba(17,31,51,.95);border:1px solid #2a5a8a;border-radius:8px;padding:8px 14px;font-size:11px;color:#8ab0cc;z-index:4000;display:none;line-height:1.5;max-width:380px}
   body.editing .info-badge{display:block}
   .info-badge b{color:#ffe600}
   .info-badge kbd{background:#0a1628;border:1px solid #1e3a5f;border-radius:3px;padding:0 4px;font-family:monospace;font-size:10px;color:#fff}
@@ -147,6 +164,7 @@
   <div class="header-stats">
     <span>Прилавков: <span class="val" id="st-total">0</span></span>
     <span>Проходов: <span class="val" id="st-passages">0</span></span>
+    <span>Потоков: <span class="val" id="st-flows">0</span></span>
     <span>Заполнено: <span class="val" id="st-filled">0</span></span>
     <span class="stat-A">A: <span id="st-A">0</span></span>
     <span class="stat-B">B: <span id="st-B">0</span></span>
@@ -171,13 +189,16 @@
   <button class="btn btn-danger" onclick="clearAll()">✕ Очистить</button>
 </div>
 
+<div class="floor-tabs" id="floor-tabs"></div>
+
 <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
 
 <div class="tool-palette" id="tool-palette">
   <button class="tool-btn active" data-tool="pointer" onclick="setTool('pointer')" title="Двигать / выделять"><span>🖱</span><span class="lbl">Двигать</span></button>
-  <button class="tool-btn" data-tool="stall" onclick="setTool('stall')" title="Поставить прилавок"><span>📦</span><span class="lbl">Прилавок</span></button>
-  <button class="tool-btn" data-tool="passage" onclick="setTool('passage')" title="Нарисовать проход (drag)"><span>🛤</span><span class="lbl">Проход</span></button>
-  <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Править контуры зданий"><span>⬡</span><span class="lbl">Контур</span></button>
+  <button class="tool-btn" data-tool="stall" onclick="setTool('stall')" title="Прилавок (клик)"><span>📦</span><span class="lbl">Прилавок</span></button>
+  <button class="tool-btn" data-tool="passage" onclick="setTool('passage')" title="Проход (drag)"><span>🛤</span><span class="lbl">Проход</span></button>
+  <button class="tool-btn" data-tool="flow" onclick="setTool('flow')" title="Пешеходный поток"><span>👥</span><span class="lbl">Поток</span></button>
+  <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий"><span>⬡</span><span class="lbl">Контур</span></button>
   <div class="tool-divider"></div>
   <button class="tool-btn" data-tool="delete" onclick="setTool('delete')" title="Удалить (или ПКМ)"><span>🗑</span><span class="lbl">Удалить</span></button>
 </div>
@@ -246,13 +267,14 @@
   </div>
   <div class="ep-body" id="ep-body"></div>
   <div class="ep-footer">
-    <button class="btn btn-danger" onclick="resetConfig()">⤺ Сброс настроек зданий</button>
+    <button class="btn btn-danger" onclick="resetConfig()">⤺ Сброс настроек зданий этажа</button>
   </div>
 </div>
 
 <div class="info-badge">
   <b>Инструмент:</b> <span id="cur-tool-name">Двигать</span><br>
-  <kbd>ПКМ</kbd> по объекту — удалить · <kbd>Del</kbd>/<kbd>Backspace</kbd> — удалить выделенный · <kbd>Esc</kbd> — снять выделение
+  <b>Поток:</b> клики добавляют точки, <kbd>Enter</kbd> или <kbd>2×клик</kbd> — закончить · <kbd>Esc</kbd> — отмена<br>
+  <kbd>ПКМ</kbd> — удалить · <kbd>Del</kbd>/<kbd>⌫</kbd> — удалить выделенный · <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd> — undo/redo
 </div>
 
 <div id="tooltip">
@@ -264,19 +286,20 @@
 
 <script>
 // ═══════════════ КОНСТАНТЫ ═══════════════
-const STORAGE_KEY='yarmarka-tenant-audit-v2';
-const LEGACY_KEY='yarmarka-tenant-audit-v1';
-const CONFIG_KEY='yarmarka-config-v1';
-const PASSAGES_KEY='yarmarka-passages-v1';
+const FLOORS_KEY='yarmarka-floors-v1';
+const LEGACY_STALLS_V2='yarmarka-tenant-audit-v2';
+const LEGACY_STALLS_V1='yarmarka-tenant-audit-v1';
+const LEGACY_PASSAGES='yarmarka-passages-v1';
+const LEGACY_CONFIG='yarmarka-config-v1';
 
 const IMP_COLORS={A:'#2ecc71',B:'#3498db',C:'#e67e22',D:'#e74c3c','':'#1e3a5f'};
 const IMP_STROKE={A:'#27ae60',B:'#2980b9',C:'#ca6f1e',D:'#c0392b','':'#2a4a6b'};
 const IMP_LABELS={A:'A — трафик-генератор',B:'B — стабильный',C:'C — слабый',D:'D — проблемный'};
 const IMP_BG={A:'#0d2e1a',B:'#0d1e34',C:'#2e1c08',D:'#2e0d0d'};
 
-const TOOL_NAMES={pointer:'Двигать',stall:'Прилавок',passage:'Проход',vertex:'Контур',delete:'Удалить'};
+const TOOL_NAMES={pointer:'Двигать',stall:'Прилавок',passage:'Проход',flow:'Поток',vertex:'Контур',delete:'Удалить'};
 
-// ═══════════════ ЗДАНИЯ ═══════════════
+// ═══════════════ ШАБЛОН ЗДАНИЙ ═══════════════
 const DEFAULT_BUILDINGS=[
   {
     id:'C1', label:'С1 — Центральные ряды', sub:'5 крытых рядов',
@@ -310,67 +333,27 @@ const DEFAULT_BUILDINGS=[
 ];
 
 // ═══════════════ СОСТОЯНИЕ ═══════════════
-let BUILDINGS=JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
-let stalls={};      // { "C1-001": {x,y,w,h,building, tenant,category,importance,...}, ... }
-let passages=[];    // [{id, x, y, w, h, label}]
-let selectedId=null;       // в форме арендатора (sidebar)
-let editSelectedId=null;   // выделенный в режиме редактирования (рамка + ручка ресайза)
-let editSelectedType=null; // 'stall' | 'passage'
+let floors=[];               // [{name, stalls, passages, buildings, flows}]
+let currentFloorIdx=0;
+
+// алиасы — указывают на данные текущего этажа
+let stalls={}, passages=[], BUILDINGS=[], flows=[];
+
+let selectedId=null;
+let editSelectedId=null;
+let editSelectedType=null;   // 'stall' | 'passage' | 'flow'
 let currentImp='';
 let editMode=false;
 let currentTool='pointer';
-let dragState=null;        // {type, id, offsetX, offsetY}
-let drawingPassage=null;   // {x0,y0,x1,y1}
-let vertexDragging=null;   // {bid, idx}
+let dragState=null;
+let drawingPassage=null;
+let drawingFlow=null;        // {points:[[x,y],...]}
+let vertexDragging=null;
 
-// ─── undo/redo ───
+// история
 let history=[];
 let historyIdx=-1;
 const HISTORY_MAX=80;
-
-function snapshot(){
-  return JSON.stringify({
-    stalls, passages,
-    BUILDINGS: BUILDINGS.map(b=>({id:b.id,path:b.path,rows:b.rows,cols:b.cols,gapX:b.gapX,gapY:b.gapY,stallArea:b.stallArea})),
-  });
-}
-function pushHistory(){
-  history.length=historyIdx+1;
-  history.push(snapshot());
-  if(history.length>HISTORY_MAX){history.shift();}
-  historyIdx=history.length-1;
-  updateUndoBtns();
-}
-function restoreSnapshot(snapStr){
-  const s=JSON.parse(snapStr);
-  stalls=s.stalls;
-  passages=s.passages;
-  // merge BUILDINGS edits (path, rows...) onto DEFAULT_BUILDINGS template
-  BUILDINGS=DEFAULT_BUILDINGS.map(def=>{
-    const sav=s.BUILDINGS.find(x=>x.id===def.id);
-    if(!sav)return JSON.parse(JSON.stringify(def));
-    return{...JSON.parse(JSON.stringify(def)),
-      rows:sav.rows, cols:sav.cols, gapX:sav.gapX, gapY:sav.gapY,
-      path:sav.path, stallArea:sav.stallArea};
-  });
-  saveStalls(); savePassages(); saveConfig();
-  if(selectedId && !stalls[selectedId]) closeSidebar();
-  if(editSelectedId){
-    const exists=editSelectedType==='stall'?!!stalls[editSelectedId]:passages.some(p=>p.id===editSelectedId);
-    if(!exists){editSelectedId=null;editSelectedType=null;}
-  }
-  buildSVG();
-  updateStats();
-  if(editMode) renderEditPanel();
-  updateUndoBtns();
-}
-function undo(){if(historyIdx<=0)return;historyIdx--;restoreSnapshot(history[historyIdx]);}
-function redo(){if(historyIdx>=history.length-1)return;historyIdx++;restoreSnapshot(history[historyIdx]);}
-function updateUndoBtns(){
-  const u=document.getElementById('btn-undo'), r=document.getElementById('btn-redo');
-  if(u) u.disabled=historyIdx<=0;
-  if(r) r.disabled=historyIdx>=history.length-1;
-}
 
 // ═══════════════ УТИЛИТЫ ═══════════════
 function parsePath(d){
@@ -401,8 +384,7 @@ function whichBuilding(x,y){
   return null;
 }
 function getNextStallId(prefix){
-  let max=0;
-  const p=prefix+'-';
+  let max=0; const p=prefix+'-';
   for(const id of Object.keys(stalls)){
     if(id.startsWith(p)){
       const n=parseInt(id.slice(p.length),10);
@@ -412,65 +394,118 @@ function getNextStallId(prefix){
   return p+String(max+1).padStart(3,'0');
 }
 
-// ═══════════════ ХРАНИЛИЩЕ ═══════════════
-function loadAll(){
-  try{stalls=JSON.parse(localStorage.getItem(STORAGE_KEY))||{}}catch{stalls={}}
-  // миграция из v1 если v2 пуст
-  if(Object.keys(stalls).length===0){
-    try{
-      const legacy=JSON.parse(localStorage.getItem(LEGACY_KEY));
-      if(legacy && Object.keys(legacy).length>0){
-        for(const [id,data] of Object.entries(legacy)) stalls[id]={...data};
-      }
-    }catch{}
-  }
-  try{passages=JSON.parse(localStorage.getItem(PASSAGES_KEY))||[]}catch{passages=[]}
-  try{
-    const saved=JSON.parse(localStorage.getItem(CONFIG_KEY));
-    if(saved) BUILDINGS=DEFAULT_BUILDINGS.map(def=>{
-      const s=saved.find(x=>x.id===def.id);
-      if(!s)return JSON.parse(JSON.stringify(def));
-      return{...JSON.parse(JSON.stringify(def)),
-        rows:s.rows??def.rows, cols:s.cols??def.cols,
-        gapX:s.gapX??def.gapX, gapY:s.gapY??def.gapY,
-        path:s.path||def.path,
-        stallArea:{...def.stallArea,...(s.stallArea||{})}};
-    });
-  }catch{}
-}
-function saveStalls(){localStorage.setItem(STORAGE_KEY,JSON.stringify(stalls))}
-function savePassages(){localStorage.setItem(PASSAGES_KEY,JSON.stringify(passages))}
-function saveConfig(){
-  const data=BUILDINGS.map(b=>({id:b.id,rows:b.rows,cols:b.cols,gapX:b.gapX,gapY:b.gapY,stallArea:b.stallArea,path:b.path}));
-  localStorage.setItem(CONFIG_KEY,JSON.stringify(data));
+// стиль потоковой линии в зависимости от количества чел/ч
+function flowStyle(count){
+  const c=+count||0;
+  const w=Math.min(14, 1.5+c/110);
+  let color;
+  if(c<200)        color='#3498db';   // синий — низкая
+  else if(c<500)   color='#1abc9c';   // бирюза
+  else if(c<1000)  color='#f1c40f';   // жёлто-оранжевая
+  else if(c<2000)  color='#e67e22';   // оранжевая
+  else             color='#e74c3c';   // красная
+  return {w,color};
 }
 
-// миграция: если у прилавка нет x/y — рассчитать по дефолтной сетке здания
+// ═══════════════ ХРАНИЛИЩЕ + МИГРАЦИЯ ═══════════════
+function makeDefaultBuildings(){
+  return JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
+}
+function makeEmptyFloor(name){
+  return {name, stalls:{}, passages:[], buildings:makeDefaultBuildings(), flows:[]};
+}
+
+function loadAll(){
+  // пробуем новый формат
+  try{
+    const data=JSON.parse(localStorage.getItem(FLOORS_KEY));
+    if(data && Array.isArray(data.floors) && data.floors.length>0){
+      floors=data.floors;
+      currentFloorIdx=Math.max(0,Math.min(data.currentFloorIdx||0, floors.length-1));
+      // нормализация — у каждого этажа должны быть все поля
+      for(const f of floors){
+        if(!f.stalls) f.stalls={};
+        if(!f.passages) f.passages=[];
+        if(!f.flows) f.flows=[];
+        if(!f.buildings || f.buildings.length===0) f.buildings=makeDefaultBuildings();
+      }
+      syncAliases();
+      return;
+    }
+  }catch{}
+
+  // миграция из старого формата
+  let oldStalls={}, oldPassages=[], oldBuildings=makeDefaultBuildings();
+  try{const v=localStorage.getItem(LEGACY_STALLS_V2); if(v) oldStalls=JSON.parse(v)||{};}catch{}
+  if(Object.keys(oldStalls).length===0){
+    try{const v=localStorage.getItem(LEGACY_STALLS_V1); if(v) oldStalls=JSON.parse(v)||{};}catch{}
+  }
+  try{const v=localStorage.getItem(LEGACY_PASSAGES); if(v) oldPassages=JSON.parse(v)||[];}catch{}
+  try{
+    const v=localStorage.getItem(LEGACY_CONFIG);
+    if(v){
+      const saved=JSON.parse(v);
+      oldBuildings=DEFAULT_BUILDINGS.map(def=>{
+        const s=saved.find(x=>x.id===def.id);
+        if(!s)return JSON.parse(JSON.stringify(def));
+        return{...JSON.parse(JSON.stringify(def)),
+          rows:s.rows??def.rows, cols:s.cols??def.cols,
+          gapX:s.gapX??def.gapX, gapY:s.gapY??def.gapY,
+          path:s.path||def.path,
+          stallArea:{...def.stallArea,...(s.stallArea||{})}};
+      });
+    }
+  }catch{}
+
+  floors=[{name:'1 этаж', stalls:oldStalls, passages:oldPassages, buildings:oldBuildings, flows:[]}];
+  currentFloorIdx=0;
+  syncAliases();
+}
+
+function syncAliases(){
+  const f=floors[currentFloorIdx];
+  stalls=f.stalls;
+  passages=f.passages;
+  BUILDINGS=f.buildings;
+  flows=f.flows;
+}
+
+function saveAll(){
+  // на случай если алиасы реассайнились (после реассигна clearAll и т.п.) — синхронизируем
+  const f=floors[currentFloorIdx];
+  f.stalls=stalls; f.passages=passages; f.buildings=BUILDINGS; f.flows=flows;
+  localStorage.setItem(FLOORS_KEY, JSON.stringify({floors,currentFloorIdx}));
+}
+// псевдо-savers, всё идёт через saveAll
+const saveStalls=saveAll, savePassages=saveAll, saveConfig=saveAll, saveFlows=saveAll;
+
+// миграция: у прилавков без x/y — посчитать позиции
 function migrateStallPositions(){
   let changed=false;
-  for(const [id,data] of Object.entries(stalls)){
-    if(typeof data.x==='number' && typeof data.y==='number') continue;
-    const m=id.match(/^([A-ZА-Я0-9]+)-(\d+)$/);
-    if(!m)continue;
-    const [,bid,numStr]=m;
-    const b=BUILDINGS.find(x=>x.id===bid);
-    if(!b)continue;
-    const n=parseInt(numStr,10);
-    if(isNaN(n))continue;
-    const r=Math.floor((n-1)/b.cols), c=(n-1)%b.cols;
-    const sw=(b.stallArea.w-(b.cols-1)*b.gapX)/b.cols;
-    const sh=(b.stallArea.h-(b.rows-1)*b.gapY)/b.rows;
-    data.x=Math.round(b.stallArea.x+c*(sw+b.gapX));
-    data.y=Math.round(b.stallArea.y+r*(sh+b.gapY));
-    data.w=Math.round(sw);
-    data.h=Math.round(sh);
-    data.building=bid;
-    changed=true;
+  for(const f of floors){
+    for(const [id,data] of Object.entries(f.stalls)){
+      if(typeof data.x==='number' && typeof data.y==='number') continue;
+      const m=id.match(/^([A-ZА-Я0-9]+)-(\d+)$/);
+      if(!m)continue;
+      const [,bid,numStr]=m;
+      const b=f.buildings.find(x=>x.id===bid);
+      if(!b)continue;
+      const n=parseInt(numStr,10);
+      if(isNaN(n))continue;
+      const r=Math.floor((n-1)/b.cols), c=(n-1)%b.cols;
+      const sw=(b.stallArea.w-(b.cols-1)*b.gapX)/b.cols;
+      const sh=(b.stallArea.h-(b.rows-1)*b.gapY)/b.rows;
+      data.x=Math.round(b.stallArea.x+c*(sw+b.gapX));
+      data.y=Math.round(b.stallArea.y+r*(sh+b.gapY));
+      data.w=Math.round(sw);
+      data.h=Math.round(sh);
+      data.building=bid;
+      changed=true;
+    }
   }
-  if(changed) saveStalls();
+  if(changed) saveAll();
 }
 
-// первичное наполнение сеток если пусто
 function generateGrid(buildingId, replace=false){
   const b=BUILDINGS.find(x=>x.id===buildingId);
   if(!b)return;
@@ -496,12 +531,98 @@ function generateGrid(buildingId, replace=false){
       };
     }
   }
-  saveStalls();
+  saveAll();
 }
 
 function ensureInitial(){
-  if(Object.keys(stalls).length>0)return;
-  for(const b of DEFAULT_BUILDINGS) generateGrid(b.id);
+  if(floors.length===0){
+    floors.push(makeEmptyFloor('1 этаж'));
+    currentFloorIdx=0;
+    syncAliases();
+  }
+  // если на 1-м этаже нет прилавков — нагенерим по сетке
+  const f=floors[0];
+  if(Object.keys(f.stalls).length===0){
+    const prev={stalls,passages,BUILDINGS,flows,currentFloorIdx};
+    currentFloorIdx=0;
+    syncAliases();
+    for(const b of f.buildings) generateGrid(b.id);
+    // вернёмся в текущий
+    currentFloorIdx=prev.currentFloorIdx;
+    syncAliases();
+  }
+}
+
+// ═══════════════ ЭТАЖИ ═══════════════
+function renderFloorTabs(){
+  const c=document.getElementById('floor-tabs');
+  c.innerHTML='';
+  floors.forEach((f,i)=>{
+    const tab=document.createElement('div');
+    tab.className='floor-tab'+(i===currentFloorIdx?' active':'');
+    const stallsCount=Object.keys(f.stalls).length;
+    tab.innerHTML=`
+      <span onclick="switchFloor(${i})">${escapeHtml(f.name)}</span>
+      <span class="ft-cnt" onclick="switchFloor(${i})">${stallsCount}</span>
+      <button class="ft-act" onclick="renameFloorPrompt(${i})" title="Переименовать">✏</button>
+      <button class="ft-act" onclick="deleteFloorPrompt(${i})" title="Удалить этаж">×</button>
+    `;
+    tab.querySelector('span').addEventListener('click',()=>switchFloor(i));
+    c.appendChild(tab);
+  });
+  const add=document.createElement('button');
+  add.className='floor-add';
+  add.textContent='+ этаж';
+  add.onclick=addFloor;
+  c.appendChild(add);
+}
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+function switchFloor(idx){
+  if(idx<0||idx>=floors.length||idx===currentFloorIdx)return;
+  saveAll();
+  currentFloorIdx=idx;
+  syncAliases();
+  editSelectedId=null; editSelectedType=null;
+  selectedId=null; closeSidebar();
+  drawingFlow=null; drawingPassage=null;
+  saveAll();
+  renderFloorTabs();
+  if(editMode) renderEditPanel();
+  buildSVG();
+  updateStats();
+}
+
+function addFloor(){
+  const name=prompt('Название нового этажа:',`Этаж ${floors.length+1}`);
+  if(!name)return;
+  // копируем контуры зданий с текущего этажа (стены — те же на всех этажах)
+  const buildings=JSON.parse(JSON.stringify(floors[currentFloorIdx].buildings));
+  floors.push({name:name.trim(), stalls:{}, passages:[], buildings, flows:[]});
+  pushHistory();
+  switchFloor(floors.length-1);
+}
+
+function renameFloorPrompt(idx){
+  const name=prompt('Новое название этажа:', floors[idx].name);
+  if(!name) return;
+  floors[idx].name=name.trim();
+  pushHistory();
+  saveAll();
+  renderFloorTabs();
+}
+
+function deleteFloorPrompt(idx){
+  if(floors.length<=1){alert('Должен остаться хотя бы один этаж.');return;}
+  if(!confirm(`Удалить «${floors[idx].name}» вместе со всеми прилавками, проходами и потоками этого этажа?`))return;
+  floors.splice(idx,1);
+  if(currentFloorIdx>=floors.length) currentFloorIdx=floors.length-1;
+  pushHistory();
+  syncAliases();
+  renderFloorTabs();
+  if(editMode) renderEditPanel();
+  buildSVG();
+  updateStats();
 }
 
 // ═══════════════ SVG ═══════════════
@@ -519,12 +640,11 @@ function svgPoint(evt){
   return pt.matrixTransform(svg.getScreenCTM().inverse());
 }
 
-// ═══════════════ РЕНДЕР ═══════════════
 function buildSVG(){
   const svg=document.getElementById('ymap');
   svg.innerHTML='';
 
-  // фон / дороги / плот
+  // фон / периметр / плот
   svg.appendChild(el('rect',{width:800,height:950,fill:'#08111e'}));
   svg.appendChild(el('rect',{x:0,y:0,width:800,height:170,fill:'#0a1628'}));
   svg.appendChild(el('rect',{x:0,y:880,width:800,height:70,fill:'#0a1628'}));
@@ -532,7 +652,7 @@ function buildSVG(){
   svg.appendChild(el('rect',{x:710,y:0,width:90,height:950,fill:'#0a1628'}));
   svg.appendChild(el('rect',{x:90,y:170,width:620,height:710,fill:'#0c1d30'}));
 
-  // границы плота (без подписей улиц)
+  // пунктирные границы плота
   svg.appendChild(el('line',{x1:0,y1:135,x2:800,y2:135,stroke:'#1a3a5f','stroke-width':1.5,'stroke-dasharray':'10,6'}));
   svg.appendChild(el('line',{x1:725,y1:170,x2:725,y2:880,stroke:'#1a3a5f','stroke-width':1.5,'stroke-dasharray':'10,6'}));
   svg.appendChild(el('line',{x1:75,y1:170,x2:75,y2:880,stroke:'#1a3a5f','stroke-width':1.5,'stroke-dasharray':'10,6'}));
@@ -543,7 +663,10 @@ function buildSVG(){
   drawGateArrow(svg, 720, 350, '←', 'вход');
   drawGateArrow(svg, 300, 885, '↑', 'вход');
 
-  // здания (контуры)
+  // этаж-метка (для контекста)
+  svg.appendChild(el('text',{x:400,y:90,'text-anchor':'middle','font-size':16,'font-weight':800,fill:'rgba(255,255,255,.15)','font-family':'sans-serif','pointer-events':'none','letter-spacing':2},floors[currentFloorIdx].name.toUpperCase()));
+
+  // здания
   for(const b of BUILDINGS) renderBuilding(svg,b);
 
   // узел сетей в С3
@@ -554,19 +677,22 @@ function buildSVG(){
     svg.appendChild(el('text',{x:ux,y:uy+3.5,'text-anchor':'middle','font-size':10,fill:'#fff','font-weight':'bold','font-family':'sans-serif','pointer-events':'none'},'⚡'));
   }
 
-  // компас
   drawCompass(svg, 110, 120);
 
-  // проходы (под прилавками)
+  // проходы (под прилавками и потоками)
   for(const p of passages) renderPassage(svg,p);
 
   // прилавки
   for(const [id, s] of Object.entries(stalls)) renderStall(svg, id, s);
 
-  // оверлеи режима редактирования
+  // потоки — поверх всего
+  for(const f of flows) renderFlow(svg, f);
+
+  // оверлеи редактирования
   if(editMode){
     if(currentTool==='vertex') renderVertexHandles(svg);
     renderEditSelectionOverlays(svg);
+    if(drawingFlow) renderFlowGhost(svg);
   }
 }
 
@@ -577,8 +703,7 @@ function renderBuilding(svg, b){
 }
 
 function renderStall(svg, id, s){
-  const data=s;
-  const imp=data.importance||'';
+  const imp=s.importance||'';
   const rect=el('rect',{
     id:`stall-${id}`,
     class:'stall-rect'+(editMode && editSelectedType==='stall' && editSelectedId===id ? ' edit-selected':'')+(!editMode && selectedId===id ? ' form-selected':''),
@@ -588,8 +713,6 @@ function renderStall(svg, id, s){
     'data-id':id,'data-kind':'stall',
   });
   svg.appendChild(rect);
-
-  // номер
   if(s.w>=18 && s.h>=14){
     const num=id.split('-').pop();
     const fs=Math.max(6,Math.min(9,Math.min(s.h*0.4,s.w*0.32)));
@@ -619,32 +742,79 @@ function renderPassage(svg, p){
   }
 }
 
+function renderFlow(svg, f){
+  const {w,color}=flowStyle(f.count);
+  const pts=f.points;
+  if(pts.length<2)return;
+  const d='M '+pts.map(p=>p.join(' ')).join(' L ');
+  const sel=editMode && editSelectedType==='flow' && editSelectedId===f.id;
+  svg.appendChild(el('path',{
+    id:`flow-${f.id}`,
+    class:'flow-line'+(sel?' edit-selected':''),
+    d, stroke:color,'stroke-width':w,'stroke-linejoin':'round','stroke-linecap':'round',
+    opacity:0.72,
+    'data-id':f.id,'data-kind':'flow',
+  }));
+  // стрелка на конце
+  const last=pts[pts.length-1], prev=pts[pts.length-2];
+  const ang=Math.atan2(last[1]-prev[1], last[0]-prev[0]);
+  const ah=Math.max(8, w*1.4);
+  const ax1=last[0]-ah*Math.cos(ang-Math.PI/6), ay1=last[1]-ah*Math.sin(ang-Math.PI/6);
+  const ax2=last[0]-ah*Math.cos(ang+Math.PI/6), ay2=last[1]-ah*Math.sin(ang+Math.PI/6);
+  svg.appendChild(el('polygon',{
+    points:`${last[0]},${last[1]} ${ax1},${ay1} ${ax2},${ay2}`,
+    fill:color, opacity:0.95,'pointer-events':'none',
+  }));
+  // подпись чел/ч (на середине)
+  const mid=pts[Math.floor((pts.length-1)/2)];
+  const next=pts[Math.floor((pts.length-1)/2)+1]||mid;
+  const mx=(mid[0]+next[0])/2, my=(mid[1]+next[1])/2;
+  svg.appendChild(el('text',{
+    class:'flow-label', x:mx, y:my-8,'text-anchor':'middle',
+  }, (f.count||0)+' чел/ч'));
+}
+
+function renderFlowGhost(svg){
+  const pts=drawingFlow.points;
+  if(pts.length===0)return;
+  // линия между точками (если их >= 2)
+  if(pts.length>=2){
+    const d='M '+pts.map(p=>p.join(' ')).join(' L ');
+    svg.appendChild(el('path',{id:'flow-ghost',d,fill:'none',stroke:'#3498db','stroke-width':3,'stroke-dasharray':'5,4',opacity:.85,'pointer-events':'none'}));
+  }
+  // точки
+  pts.forEach((p,i)=>{
+    svg.appendChild(el('circle',{cx:p[0],cy:p[1],r:5,fill:i===0?'#2ecc71':'#3498db',stroke:'#fff','stroke-width':1.5,'pointer-events':'none'}));
+  });
+  // последняя — выделена, и пунктир к курсору добавим динамически в onDocMouseMove
+}
+
 function renderVertexHandles(svg){
   for(const b of BUILDINGS){
     const pts=parsePath(b.path);
     pts.forEach((pp,i)=>{
-      const h=el('circle',{
-        cx:pp[0],cy:pp[1],r:6,
-        class:'vertex-handle',
+      svg.appendChild(el('circle',{
+        cx:pp[0],cy:pp[1],r:6,class:'vertex-handle',
         'data-bid':b.id,'data-idx':i,'data-kind':'vertex',
-      });
-      svg.appendChild(h);
+      }));
     });
   }
 }
 
 function renderEditSelectionOverlays(svg){
-  if(!editSelectedId) return;
-  let obj=null;
-  if(editSelectedType==='stall') obj=stalls[editSelectedId];
-  else if(editSelectedType==='passage') obj=passages.find(p=>p.id===editSelectedId);
-  if(!obj) return;
-  // ручка ресайза в правом-нижнем углу
+  if(!editSelectedId)return;
+  let obj=null, bbox=null;
+  if(editSelectedType==='stall'){
+    obj=stalls[editSelectedId];
+    if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};
+  } else if(editSelectedType==='passage'){
+    obj=passages.find(p=>p.id===editSelectedId);
+    if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};
+  }
+  if(!bbox)return;
   svg.appendChild(el('rect',{
-    id:'resize-handle',
-    class:'resize-handle',
-    x:obj.x+obj.w-5,y:obj.y+obj.h-5,
-    width:10,height:10,rx:1,
+    id:'resize-handle',class:'resize-handle',
+    x:bbox.x+bbox.w-5,y:bbox.y+bbox.h-5,width:10,height:10,rx:1,
     'data-kind':'resize',
   }));
 }
@@ -674,21 +844,20 @@ function setTool(tool){
   document.body.className=document.body.className.split(/\s+/).filter(c=>!c.startsWith('tool-')).join(' ')+' tool-'+tool;
   document.getElementById('cur-tool-name').textContent=TOOL_NAMES[tool];
   editSelectedId=null; editSelectedType=null;
+  // отменить активные операции при смене инструмента
+  if(drawingFlow && tool!=='flow'){drawingFlow=null;}
+  if(drawingPassage && tool!=='passage'){drawingPassage=null;}
   buildSVG();
 }
 
 // ═══════════════ МЫШЬ ═══════════════
 function onSvgMouseDown(e){
-  if(e.button!==0)return; // только левая кнопка
-  if(!editMode){
-    // обычный режим — клик по прилавку откроет форму через свой click-обработчик
-    return;
-  }
+  if(e.button!==0)return;
+  if(!editMode) return;
   const p=svgPoint(e);
   const tg=e.target;
   const kind=tg.dataset && tg.dataset.kind;
 
-  // VERTEX tool
   if(currentTool==='vertex'){
     if(kind==='vertex'){
       e.preventDefault();
@@ -697,11 +866,9 @@ function onSvgMouseDown(e){
     return;
   }
 
-  // POINTER tool
   if(currentTool==='pointer'){
     if(kind==='resize'){
-      e.preventDefault();
-      dragState={type:'resize'};
+      e.preventDefault(); dragState={type:'resize'};
     } else if(kind==='stall'){
       e.preventDefault();
       const id=tg.dataset.id;
@@ -716,52 +883,71 @@ function onSvgMouseDown(e){
       const ps=passages.find(p=>p.id===id);
       dragState={type:'passage', id, offsetX:p.x-ps.x, offsetY:p.y-ps.y, moved:false, startX:p.x, startY:p.y};
       buildSVG();
+    } else if(kind==='flow'){
+      e.preventDefault();
+      const id=tg.dataset.id;
+      const f=flows.find(x=>x.id===id);
+      editSelectedId=id; editSelectedType='flow';
+      // редактируем количество
+      const newCount=prompt(`Чел/час для потока «${id}»:`, f.count||0);
+      if(newCount!==null){
+        const n=Math.max(0, parseInt(newCount,10)||0);
+        f.count=n;
+        saveAll(); pushHistory(); buildSVG(); updateStats();
+      } else {
+        buildSVG();
+      }
     } else {
-      // клик по пустому — снять выделение
       if(editSelectedId){editSelectedId=null; editSelectedType=null; buildSVG();}
     }
     return;
   }
 
-  // STALL tool — добавить прилавок в точке клика
   if(currentTool==='stall'){
     e.preventDefault();
     const w=30,h=24;
     const bid=whichBuilding(p.x,p.y)||'X';
     const id=getNextStallId(bid);
     stalls[id]={x:Math.round(p.x-w/2),y:Math.round(p.y-h/2),w,h,building:bid};
-    saveStalls();
-    pushHistory();
+    saveAll(); pushHistory();
     editSelectedId=id; editSelectedType='stall';
-    buildSVG();
-    updateStats();
+    buildSVG(); updateStats(); renderFloorTabs();
     return;
   }
 
-  // PASSAGE tool — начать рисование прямоугольника
   if(currentTool==='passage'){
     e.preventDefault();
     drawingPassage={x0:p.x,y0:p.y,x1:p.x,y1:p.y};
     const svg=document.getElementById('ymap');
     svg.appendChild(el('rect',{
-      id:'passage-ghost',
-      x:p.x,y:p.y,width:0,height:0,
+      id:'passage-ghost', x:p.x,y:p.y,width:0,height:0,
       fill:'rgba(74,144,217,.25)',stroke:'#4a90d9','stroke-width':1.5,
       'stroke-dasharray':'4,3','pointer-events':'none',
     }));
     return;
   }
 
-  // DELETE tool — удалить тыкнутый объект
+  if(currentTool==='flow'){
+    e.preventDefault();
+    if(!drawingFlow){
+      drawingFlow={points:[[Math.round(p.x),Math.round(p.y)]]};
+    } else {
+      drawingFlow.points.push([Math.round(p.x),Math.round(p.y)]);
+    }
+    buildSVG();
+    return;
+  }
+
   if(currentTool==='delete'){
     e.preventDefault();
     if(kind==='stall'){
-      const id=tg.dataset.id;
-      delete stalls[id]; saveStalls(); pushHistory(); buildSVG(); updateStats();
+      delete stalls[tg.dataset.id]; saveAll(); pushHistory(); buildSVG(); updateStats(); renderFloorTabs();
     } else if(kind==='passage'){
-      const id=tg.dataset.id;
-      passages=passages.filter(p=>p.id!==id);
-      savePassages(); pushHistory(); buildSVG(); updateStats();
+      const idx=passages.findIndex(p=>p.id===tg.dataset.id);
+      if(idx>=0){passages.splice(idx,1); saveAll(); pushHistory(); buildSVG(); updateStats();}
+    } else if(kind==='flow'){
+      const idx=flows.findIndex(p=>p.id===tg.dataset.id);
+      if(idx>=0){flows.splice(idx,1); saveAll(); pushHistory(); buildSVG(); updateStats();}
     } else if(kind==='vertex'){
       removeVertex(e);
     }
@@ -770,7 +956,6 @@ function onSvgMouseDown(e){
 }
 
 function onDocMouseMove(e){
-  // VERTEX drag
   if(vertexDragging){
     const p=svgPoint(e);
     const x=Math.round(p.x),y=Math.round(p.y);
@@ -786,7 +971,6 @@ function onDocMouseMove(e){
     return;
   }
 
-  // DRAG state
   if(dragState){
     const p=svgPoint(e);
     if(dragState.type==='stall'){
@@ -797,16 +981,11 @@ function onDocMouseMove(e){
       const rect=document.getElementById('stall-'+dragState.id);
       if(rect){rect.setAttribute('x',nx);rect.setAttribute('y',ny);}
       moveResizeHandle(s);
-      moveStallNumber(dragState.id, s);
     } else if(dragState.type==='passage'){
       const ps=passages.find(p=>p.id===dragState.id);
       ps.x=Math.round(p.x-dragState.offsetX);
       ps.y=Math.round(p.y-dragState.offsetY);
       if(!dragState.moved && (Math.abs(p.x-dragState.startX)>2||Math.abs(p.y-dragState.startY)>2)) dragState.moved=true;
-      const rect=document.getElementById('psg-'+ps.id);
-      if(rect){rect.setAttribute('x',ps.x);rect.setAttribute('y',ps.y);}
-      moveResizeHandle(ps);
-      // подпись подвинуть
       buildSVG();
     } else if(dragState.type==='resize'){
       if(editSelectedType==='stall'){
@@ -828,7 +1007,6 @@ function onDocMouseMove(e){
     return;
   }
 
-  // PASSAGE drawing
   if(drawingPassage){
     const p=svgPoint(e);
     drawingPassage.x1=p.x;drawingPassage.y1=p.y;
@@ -841,15 +1019,29 @@ function onDocMouseMove(e){
       ghost.setAttribute('x',x);ghost.setAttribute('y',y);
       ghost.setAttribute('width',w);ghost.setAttribute('height',h);
     }
+    return;
+  }
+
+  // flow: пунктир от последней точки до курсора
+  if(drawingFlow && drawingFlow.points.length>=1 && currentTool==='flow'){
+    const p=svgPoint(e);
+    const last=drawingFlow.points[drawingFlow.points.length-1];
+    let pending=document.getElementById('flow-pending');
+    const svg=document.getElementById('ymap');
+    if(!pending){
+      pending=el('line',{id:'flow-pending', stroke:'#3498db','stroke-width':2.5,'stroke-dasharray':'5,4',opacity:.6,'pointer-events':'none'});
+      svg.appendChild(pending);
+    }
+    pending.setAttribute('x1',last[0]); pending.setAttribute('y1',last[1]);
+    pending.setAttribute('x2',p.x); pending.setAttribute('y2',p.y);
   }
 }
 
 function onDocMouseUp(e){
-  if(vertexDragging){saveConfig();pushHistory();vertexDragging=null;}
+  if(vertexDragging){saveAll(); pushHistory(); vertexDragging=null;}
   if(dragState){
     const wasMoved=dragState.moved||dragState.type==='resize';
-    if(dragState.type==='stall' || dragState.type==='resize'){saveStalls(); if(wasMoved) pushHistory();}
-    else if(dragState.type==='passage'){savePassages(); if(wasMoved) pushHistory();}
+    if(wasMoved){saveAll(); pushHistory();}
     dragState=null;
   }
   if(drawingPassage){
@@ -860,12 +1052,9 @@ function onDocMouseUp(e){
     const w=Math.abs(drawingPassage.x1-drawingPassage.x0);
     const h=Math.abs(drawingPassage.y1-drawingPassage.y0);
     if(w>=10&&h>=10){
-      const lbl=prompt('Подпись прохода (можно оставить пустой):', '')||'';
+      const lbl=prompt('Подпись прохода (можно пусто):', '')||'';
       passages.push({id:'P'+Date.now(),x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h),label:lbl});
-      savePassages();
-      pushHistory();
-      buildSVG();
-      updateStats();
+      saveAll(); pushHistory(); buildSVG(); updateStats();
     }
     drawingPassage=null;
   }
@@ -877,32 +1066,53 @@ function onSvgContextMenu(e){
   const kind=tg.dataset && tg.dataset.kind;
   if(kind==='stall'){
     e.preventDefault();
-    delete stalls[tg.dataset.id]; saveStalls(); pushHistory(); buildSVG(); updateStats();
+    delete stalls[tg.dataset.id]; saveAll(); pushHistory(); buildSVG(); updateStats(); renderFloorTabs();
   } else if(kind==='passage'){
     e.preventDefault();
-    passages=passages.filter(p=>p.id!==tg.dataset.id); savePassages(); pushHistory(); buildSVG(); updateStats();
+    const idx=passages.findIndex(p=>p.id===tg.dataset.id);
+    if(idx>=0){passages.splice(idx,1); saveAll(); pushHistory(); buildSVG(); updateStats();}
+  } else if(kind==='flow'){
+    e.preventDefault();
+    const idx=flows.findIndex(p=>p.id===tg.dataset.id);
+    if(idx>=0){flows.splice(idx,1); saveAll(); pushHistory(); buildSVG(); updateStats();}
   } else if(kind==='vertex'){
     e.preventDefault();
     removeVertex(e);
   }
 }
 
+function onSvgDblClick(e){
+  if(!editMode) return;
+  // закончить рисование потока на двойном клике
+  if(currentTool==='flow' && drawingFlow){
+    e.preventDefault();
+    // последний click уже добавил точку, продублированную dblclick — уберём
+    if(drawingFlow.points.length>=2) drawingFlow.points.pop();
+    finishFlow();
+    return;
+  }
+  if(currentTool==='vertex' && e.target.dataset && e.target.dataset.kind==='vertex'){
+    insertVertex(e);
+  }
+}
+
+function finishFlow(){
+  if(!drawingFlow){return;}
+  const pts=drawingFlow.points;
+  if(pts.length<2){drawingFlow=null; document.getElementById('flow-pending')?.remove(); buildSVG(); return;}
+  const cnt=prompt('Количество человек в час на этом отрезке:', '500');
+  document.getElementById('flow-pending')?.remove();
+  if(cnt===null){drawingFlow=null; buildSVG(); return;}
+  const count=Math.max(0, parseInt(cnt,10)||0);
+  flows.push({id:'F'+Date.now(), points:pts.slice(), count, label:''});
+  saveAll(); pushHistory();
+  drawingFlow=null;
+  buildSVG(); updateStats();
+}
+
 function moveResizeHandle(obj){
   const h=document.getElementById('resize-handle');
   if(h){h.setAttribute('x',obj.x+obj.w-5);h.setAttribute('y',obj.y+obj.h-5);}
-}
-function moveStallNumber(id, s){
-  // полный rebuild при необходимости (для номера в центре)
-  // оптимизация: пропустим — номера обновятся при mouseup через полный rebuild не делается, но в нашем случае
-  // достаточно того что цифра — отдельный text. Найдём его позицию проще через перерисовку всей карты в mouseup.
-}
-
-// двойной клик по вершине — добавить точку
-function onSvgDblClick(e){
-  if(!editMode || currentTool!=='vertex')return;
-  if(e.target.dataset && e.target.dataset.kind==='vertex'){
-    insertVertex(e);
-  }
 }
 
 function removeVertex(e){
@@ -913,10 +1123,7 @@ function removeVertex(e){
   if(pts.length<=3){alert('Минимум 3 точки в контуре.');return;}
   pts.splice(idx,1);
   b.path=pointsToPath(pts);
-  saveConfig();
-  pushHistory();
-  buildSVG();
-  syncPathInput(b.id);
+  saveAll(); pushHistory(); buildSVG(); syncPathInput(b.id);
 }
 function insertVertex(e){
   e.preventDefault();e.stopPropagation();
@@ -928,46 +1135,48 @@ function insertVertex(e){
   const mid=[Math.round((pts[idx][0]+pts[next][0])/2),Math.round((pts[idx][1]+pts[next][1])/2)];
   pts.splice(idx+1,0,mid);
   b.path=pointsToPath(pts);
-  saveConfig();
-  pushHistory();
-  buildSVG();
-  syncPathInput(b.id);
+  saveAll(); pushHistory(); buildSVG(); syncPathInput(b.id);
 }
 function syncPathInput(bid){
   const inp=document.querySelector(`textarea[data-bid="${bid}"][data-field="path"]`);
   if(inp){const b=BUILDINGS.find(x=>x.id===bid);inp.value=b.path;}
 }
 
-// Клавиатура
+// ═══════════════ КЛАВИАТУРА ═══════════════
 document.addEventListener('keydown',e=>{
-  if(!editMode)return;
+  if(!editMode){
+    if((e.metaKey||e.ctrlKey) && (e.key==='z'||e.key==='Z')){
+      if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+      e.preventDefault();
+      if(e.shiftKey) redo(); else undo();
+    }
+    return;
+  }
   if(e.key==='Escape'){
     editSelectedId=null;editSelectedType=null;
-    if(drawingPassage){drawingPassage=null;const g=document.getElementById('passage-ghost');if(g)g.remove();}
+    if(drawingPassage){drawingPassage=null;document.getElementById('passage-ghost')?.remove();}
+    if(drawingFlow){drawingFlow=null;document.getElementById('flow-pending')?.remove();}
     buildSVG();
+  } else if(e.key==='Enter'){
+    if(drawingFlow){e.preventDefault();finishFlow();}
   } else if((e.key==='Delete'||e.key==='Backspace') && editSelectedId){
     if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-    if(editSelectedType==='stall'){delete stalls[editSelectedId];saveStalls();}
-    else if(editSelectedType==='passage'){passages=passages.filter(p=>p.id!==editSelectedId);savePassages();}
-    pushHistory();
+    if(editSelectedType==='stall'){delete stalls[editSelectedId];}
+    else if(editSelectedType==='passage'){const i=passages.findIndex(p=>p.id===editSelectedId);if(i>=0) passages.splice(i,1);}
+    else if(editSelectedType==='flow'){const i=flows.findIndex(p=>p.id===editSelectedId);if(i>=0) flows.splice(i,1);}
+    saveAll(); pushHistory();
     editSelectedId=null;editSelectedType=null;
-    buildSVG();updateStats();
+    buildSVG();updateStats();renderFloorTabs();
+  } else if((e.metaKey||e.ctrlKey) && (e.key==='z'||e.key==='Z'||e.key==='я'||e.key==='Я')){
+    if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    e.preventDefault();
+    if(e.shiftKey) redo(); else undo();
   }
 });
 
-// Cmd+Z / Ctrl+Z для undo/redo (везде, кроме полей ввода)
-document.addEventListener('keydown',e=>{
-  if(!(e.metaKey||e.ctrlKey))return;
-  if(e.key!=='z'&&e.key!=='Z'&&e.key!=='я'&&e.key!=='Я')return;
-  if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-  e.preventDefault();
-  if(e.shiftKey) redo(); else undo();
-});
-
-// ═══════════════ КЛИК ПО ПРИЛАВКУ (обычный режим — форма) ═══════════════
+// ═══════════════ ФОРМА АРЕНДАТОРА ═══════════════
 function onStallClick(e){
   if(editMode) return;
-  if(dragState && dragState.moved) return;
   const tg=e.target;
   if(tg.dataset && tg.dataset.kind==='stall'){
     openStall(tg.dataset.id);
@@ -977,20 +1186,19 @@ function onStallClick(e){
 function openStall(id){
   const s=stalls[id]; if(!s)return;
   selectedId=id;
-  const d=s;
   const bld=BUILDINGS.find(x=>x.id===s.building);
   document.getElementById('sb-id').textContent=id;
-  document.getElementById('sb-bld').textContent=bld?bld.label:(s.building?s.building:'Свободное место');
-  document.getElementById('f-tenant').value=d.tenant||'';
-  document.getElementById('f-category').value=d.category||'';
-  document.getElementById('f-rent').value=d.rent||'';
-  document.getElementById('f-revenue').value=d.revenue||'';
-  document.getElementById('f-contract').value=d.contract||'';
-  document.getElementById('f-notes').value=d.notes||'';
-  currentImp=d.importance||'';
+  document.getElementById('sb-bld').textContent=(bld?bld.label:(s.building?s.building:'Свободное место'))+' · '+floors[currentFloorIdx].name;
+  document.getElementById('f-tenant').value=s.tenant||'';
+  document.getElementById('f-category').value=s.category||'';
+  document.getElementById('f-rent').value=s.rent||'';
+  document.getElementById('f-revenue').value=s.revenue||'';
+  document.getElementById('f-contract').value=s.contract||'';
+  document.getElementById('f-notes').value=s.notes||'';
+  currentImp=s.importance||'';
   updateImpButtons();
   document.querySelectorAll('.stall-rect.form-selected').forEach(r=>r.classList.remove('form-selected'));
-  const e=document.getElementById('stall-'+id); if(e)e.classList.add('form-selected');
+  const ee=document.getElementById('stall-'+id); if(ee)ee.classList.add('form-selected');
   document.getElementById('sidebar').classList.add('open');
 }
 
@@ -1001,9 +1209,7 @@ function closeSidebar(){
 }
 
 function setImp(imp){currentImp=currentImp===imp?'':imp;updateImpButtons()}
-function updateImpButtons(){
-  document.querySelectorAll('.imp-btn').forEach(b=>b.classList.toggle('active',b.dataset.imp===currentImp));
-}
+function updateImpButtons(){document.querySelectorAll('.imp-btn').forEach(b=>b.classList.toggle('active',b.dataset.imp===currentImp));}
 
 function saveStall(){
   if(!selectedId)return;
@@ -1018,10 +1224,8 @@ function saveStall(){
     notes:document.getElementById('f-notes').value.trim(),
   });
   stalls[selectedId]=s;
-  saveStalls();
-  pushHistory();
-  buildSVG();
-  updateStats();
+  saveAll(); pushHistory();
+  buildSVG(); updateStats();
   flashSave();
 }
 
@@ -1032,12 +1236,9 @@ function resetStallData(){
   if(s){
     delete s.tenant;delete s.category;delete s.importance;
     delete s.rent;delete s.revenue;delete s.contract;delete s.notes;
-    saveStalls();
-    pushHistory();
+    saveAll(); pushHistory();
   }
-  buildSVG();
-  updateStats();
-  closeSidebar();
+  buildSVG(); updateStats(); closeSidebar();
 }
 
 function renameStall(){
@@ -1045,16 +1246,14 @@ function renameStall(){
   const newId=prompt(`Новый ID для ${selectedId}:`, selectedId);
   if(!newId)return;
   const trimmed=newId.trim();
-  if(!trimmed || trimmed===selectedId) return;
+  if(!trimmed || trimmed===selectedId)return;
   if(stalls[trimmed]){alert(`ID "${trimmed}" уже используется.`);return;}
   stalls[trimmed]=stalls[selectedId];
   delete stalls[selectedId];
   selectedId=trimmed;
   document.getElementById('sb-id').textContent=trimmed;
-  saveStalls();
-  pushHistory();
-  buildSVG();
-  updateStats();
+  saveAll(); pushHistory();
+  buildSVG(); updateStats();
 }
 
 function flashSave(){
@@ -1069,21 +1268,31 @@ function flashSave(){
 function onStallEnter(e){
   if(editMode && currentTool!=='pointer') return;
   const tg=e.target;
-  if(!(tg.dataset && tg.dataset.kind==='stall')) return;
-  const id=tg.dataset.id;
-  const data=stalls[id]||{};
+  const kind=tg.dataset && tg.dataset.kind;
   const tt=document.getElementById('tooltip');
-  document.getElementById('tt-id').textContent=id;
-  document.getElementById('tt-name').textContent=data.tenant||'(не заполнен)';
-  const parts=[data.category,data.revenue?`~${Number(data.revenue).toLocaleString('ru')} ₽/мес`:null].filter(Boolean);
-  document.getElementById('tt-detail').textContent=parts.join(' · ');
-  const impEl=document.getElementById('tt-imp');
-  if(data.importance){
-    impEl.textContent=IMP_LABELS[data.importance];
-    impEl.style.cssText=`background:${IMP_BG[data.importance]};color:${IMP_COLORS[data.importance]};display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;margin-top:4px`;
-  } else {impEl.textContent='';impEl.style.display='none';}
-  tt.style.display='block';
-  moveTooltip(e);
+  if(kind==='stall'){
+    const id=tg.dataset.id; const data=stalls[id]||{};
+    document.getElementById('tt-id').textContent=id;
+    document.getElementById('tt-name').textContent=data.tenant||'(не заполнен)';
+    const parts=[data.category, data.revenue?`~${Number(data.revenue).toLocaleString('ru')} ₽/мес`:null].filter(Boolean);
+    document.getElementById('tt-detail').textContent=parts.join(' · ');
+    const impEl=document.getElementById('tt-imp');
+    if(data.importance){
+      impEl.textContent=IMP_LABELS[data.importance];
+      impEl.style.cssText=`background:${IMP_BG[data.importance]};color:${IMP_COLORS[data.importance]};display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;margin-top:4px`;
+    } else {impEl.textContent='';impEl.style.display='none';}
+    tt.style.display='block';
+    moveTooltip(e);
+  } else if(kind==='flow'){
+    const id=tg.dataset.id; const f=flows.find(x=>x.id===id);
+    if(!f)return;
+    document.getElementById('tt-id').textContent='ПОТОК '+id;
+    document.getElementById('tt-name').textContent=(f.count||0)+' чел/час';
+    document.getElementById('tt-detail').textContent=f.points.length+' точек · '+floors[currentFloorIdx].name;
+    document.getElementById('tt-imp').style.display='none';
+    tt.style.display='block';
+    moveTooltip(e);
+  }
 }
 function onStallLeave(){document.getElementById('tooltip').style.display='none'}
 function moveTooltip(e){
@@ -1105,84 +1314,80 @@ function updateStats(){
   const total=Object.keys(stalls).length;
   document.getElementById('st-total').textContent=total;
   document.getElementById('st-passages').textContent=passages.length;
+  document.getElementById('st-flows').textContent=flows.length;
   document.getElementById('st-filled').textContent=filled;
   for(const k of'ABCD')document.getElementById('st-'+k).textContent=c[k];
   document.getElementById('progress-fill').style.width=(total?filled/total*100:0)+'%';
 }
 
 function exportCSV(){
-  const h=['ID','Корпус','X','Y','W','H','Арендатор','Категория','Важность','Аренда ₽/мес','Оборот ₽/мес','Контракт до','Заметки'];
-  const rows=[h];
-  const ids=Object.keys(stalls).sort();
-  for(const id of ids){
-    const d=stalls[id];
-    rows.push([id,d.building||'',d.x,d.y,d.w,d.h,d.tenant||'',d.category||'',d.importance||'',d.rent||'',d.revenue||'',d.contract||'',d.notes||'']);
+  const rows=[];
+  // прилавки по всем этажам
+  rows.push(['Этаж','ID','Корпус','X','Y','W','H','Арендатор','Категория','Важность','Аренда ₽/мес','Оборот ₽/мес','Контракт до','Заметки']);
+  for(const fl of floors){
+    const ids=Object.keys(fl.stalls).sort();
+    for(const id of ids){
+      const d=fl.stalls[id];
+      rows.push([fl.name, id, d.building||'', d.x, d.y, d.w, d.h, d.tenant||'', d.category||'', d.importance||'', d.rent||'', d.revenue||'', d.contract||'', d.notes||'']);
+    }
   }
 
-  // ── СВОДКА ПО КОРПУСАМ ──
+  // потоки
+  rows.push([]);
+  rows.push(['ПЕШЕХОДНЫЕ ПОТОКИ']);
+  rows.push(['Этаж','ID','Чел/час','Точек','Координаты (x;y | x;y | ...)']);
+  for(const fl of floors){
+    for(const f of fl.flows){
+      rows.push([fl.name, f.id, f.count||0, f.points.length, f.points.map(p=>p.join(';')).join(' | ')]);
+    }
+  }
+
+  // сводка по корпусам — на каждом этаже
   rows.push([]);
   rows.push(['СВОДКА ПО КОРПУСАМ']);
-  rows.push(['Корпус','Название','Прилавков','Заполнено','Аренда ₽/мес','Оборот ₽/мес','Ср. аренда','Ср. оборот','Доходность %','A','B','C','D','Пустые']);
-
-  // группировка
-  const groups={};
-  for(const [_,s] of Object.entries(stalls)){
-    const bld=s.building||'X';
-    (groups[bld]=groups[bld]||[]).push(s);
+  rows.push(['Этаж','Корпус','Название','Прилавков','Заполнено','Аренда ₽/мес','Оборот ₽/мес','Ср. аренда','Ср. оборот','Доходность %','A','B','C','D','Пустые']);
+  let GtCount=0,GtFilled=0,GtRent=0,GtRev=0,GtA=0,GtB=0,GtC=0,GtD=0,GtEmpty=0;
+  for(const fl of floors){
+    const groups={};
+    for(const s of Object.values(fl.stalls)){
+      const bld=s.building||'X';
+      (groups[bld]=groups[bld]||[]).push(s);
+    }
+    const order=[...DEFAULT_BUILDINGS.map(b=>b.id),'X'];
+    for(const bid of Object.keys(groups)) if(!order.includes(bid)) order.push(bid);
+    let tCount=0,tFilled=0,tRent=0,tRev=0,tA=0,tB=0,tC=0,tD=0,tEmpty=0;
+    for(const bid of order){
+      const list=groups[bid];if(!list)continue;
+      const bld=fl.buildings.find(x=>x.id===bid);
+      const name=bld?bld.label:'(вне зданий)';
+      const count=list.length;
+      const filled=list.filter(s=>s.tenant||s.importance).length;
+      const sumRent=list.reduce((a,s)=>a+(+s.rent||0),0);
+      const sumRev=list.reduce((a,s)=>a+(+s.revenue||0),0);
+      const a=list.filter(s=>s.importance==='A').length;
+      const b=list.filter(s=>s.importance==='B').length;
+      const c=list.filter(s=>s.importance==='C').length;
+      const d=list.filter(s=>s.importance==='D').length;
+      const empty=count-filled;
+      const yieldPct=sumRev?Math.round(sumRent/sumRev*1000)/10:0;
+      rows.push([fl.name, bid, name, count, filled, sumRent, sumRev, filled?Math.round(sumRent/filled):0, filled?Math.round(sumRev/filled):0, yieldPct, a,b,c,d,empty]);
+      tCount+=count;tFilled+=filled;tRent+=sumRent;tRev+=sumRev;tA+=a;tB+=b;tC+=c;tD+=d;tEmpty+=empty;
+    }
+    rows.push([fl.name,'ИТОГО','—',tCount,tFilled,tRent,tRev,tFilled?Math.round(tRent/tFilled):0,tFilled?Math.round(tRev/tFilled):0,tRev?Math.round(tRent/tRev*1000)/10:0,tA,tB,tC,tD,tEmpty]);
+    GtCount+=tCount;GtFilled+=tFilled;GtRent+=tRent;GtRev+=tRev;GtA+=tA;GtB+=tB;GtC+=tC;GtD+=tD;GtEmpty+=tEmpty;
   }
+  rows.push(['ВСЕ ЭТАЖИ','ВСЕГО','—',GtCount,GtFilled,GtRent,GtRev,GtFilled?Math.round(GtRent/GtFilled):0,GtFilled?Math.round(GtRev/GtFilled):0,GtRev?Math.round(GtRent/GtRev*1000)/10:0,GtA,GtB,GtC,GtD,GtEmpty]);
 
-  // упорядочить корпуса: сначала по DEFAULT_BUILDINGS, потом всё остальное
-  const order=[...DEFAULT_BUILDINGS.map(b=>b.id),'X'];
-  for(const bid of Object.keys(groups)) if(!order.includes(bid)) order.push(bid);
-
-  let tCount=0,tFilled=0,tRent=0,tRev=0,tA=0,tB=0,tC=0,tD=0,tEmpty=0;
-  for(const bid of order){
-    const list=groups[bid];if(!list)continue;
-    const bld=BUILDINGS.find(x=>x.id===bid);
-    const name=bld?bld.label:'(вне зданий)';
-    const count=list.length;
-    const filled=list.filter(s=>s.tenant||s.importance).length;
-    const sumRent=list.reduce((a,s)=>a+(+s.rent||0),0);
-    const sumRev=list.reduce((a,s)=>a+(+s.revenue||0),0);
-    const a=list.filter(s=>s.importance==='A').length;
-    const b=list.filter(s=>s.importance==='B').length;
-    const c=list.filter(s=>s.importance==='C').length;
-    const d=list.filter(s=>s.importance==='D').length;
-    const empty=count-filled;
-    const yieldPct=sumRev?Math.round(sumRent/sumRev*1000)/10:0;
-    rows.push([
-      bid, name, count, filled,
-      sumRent, sumRev,
-      filled?Math.round(sumRent/filled):0,
-      filled?Math.round(sumRev/filled):0,
-      yieldPct,
-      a, b, c, d, empty
-    ]);
-    tCount+=count;tFilled+=filled;tRent+=sumRent;tRev+=sumRev;
-    tA+=a;tB+=b;tC+=c;tD+=d;tEmpty+=empty;
-  }
-  rows.push([
-    'ИТОГО','—',tCount,tFilled,tRent,tRev,
-    tFilled?Math.round(tRent/tFilled):0,
-    tFilled?Math.round(tRev/tFilled):0,
-    tRev?Math.round(tRent/tRev*1000)/10:0,
-    tA,tB,tC,tD,tEmpty
-  ]);
-
-  // ── СВОДКА ПО КАТЕГОРИЯМ ──
+  // сводка по категориям (всем этажам вместе)
   rows.push([]);
-  rows.push(['СВОДКА ПО КАТЕГОРИЯМ ТОВАРОВ']);
+  rows.push(['СВОДКА ПО КАТЕГОРИЯМ (все этажи)']);
   rows.push(['Категория','Прилавков','Аренда ₽/мес','Оборот ₽/мес','Доля оборота %']);
   const catGroups={};
-  for(const s of Object.values(stalls)){
+  for(const fl of floors) for(const s of Object.values(fl.stalls)){
     if(!s.category)continue;
     (catGroups[s.category]=catGroups[s.category]||[]).push(s);
   }
-  const catSorted=Object.entries(catGroups).sort((a,b)=>{
-    const rA=a[1].reduce((x,s)=>x+(+s.revenue||0),0);
-    const rB=b[1].reduce((x,s)=>x+(+s.revenue||0),0);
-    return rB-rA;
-  });
+  const catSorted=Object.entries(catGroups).sort((a,b)=>b[1].reduce((x,s)=>x+(+s.revenue||0),0)-a[1].reduce((x,s)=>x+(+s.revenue||0),0));
   const totalCatRev=catSorted.reduce((a,[_,l])=>a+l.reduce((x,s)=>x+(+s.revenue||0),0),0)||1;
   for(const [cat,list] of catSorted){
     const sumRent=list.reduce((a,s)=>a+(+s.rent||0),0);
@@ -1199,12 +1404,14 @@ function exportCSV(){
 }
 
 function clearAll(){
-  if(!confirm('Удалить ВСЕ прилавки и проходы? Данные арендаторов тоже пропадут. (Можно вернуть Cmd+Z)'))return;
-  stalls={};passages=[];saveStalls();savePassages();
-  pushHistory();
+  if(!confirm(`Очистить ВСЁ на «${floors[currentFloorIdx].name}» (прилавки, проходы, потоки)?`))return;
+  Object.keys(stalls).forEach(k=>delete stalls[k]);
+  passages.length=0;
+  flows.length=0;
+  saveAll(); pushHistory();
   editSelectedId=null;editSelectedType=null;selectedId=null;
   closeSidebar();
-  buildSVG();updateStats();
+  buildSVG();updateStats();renderFloorTabs();
 }
 
 // ═══════════════ РЕЖИМ РЕДАКТИРОВАНИЯ ═══════════════
@@ -1214,16 +1421,15 @@ function toggleEdit(){
   document.getElementById('btn-edit').textContent=editMode?'✓ Выйти из редактирования':'⚙ Режим редактирования';
   document.getElementById('edit-panel').classList.toggle('open',editMode);
   if(editMode){renderEditPanel();setTool('pointer');}
-  else{editSelectedId=null;editSelectedType=null;}
+  else{editSelectedId=null;editSelectedType=null;drawingFlow=null;drawingPassage=null;}
   buildSVG();
 }
 
 function renderEditPanel(){
   const body=document.getElementById('ep-body');
   body.innerHTML=`<div class="ep-hint">
-    Слева — палитра инструментов. <b>Прилавок</b>: клик по карте. <b>Проход</b>: drag-прямоугольник.
-    <b>Контур</b>: тащи жёлтые точки. <b>ПКМ</b> или инструмент <b>🗑</b> — удалить.<br>
-    Ниже — настройки сетки для авто-генерации.
+    Слева — палитра. <b>Прилавок</b>: клик. <b>Проход</b>: drag. <b>Поток</b>: клики добавляют точки, <kbd>Enter</kbd>/2× — закончить. <b>Контур</b>: жёлтые точки. <b>ПКМ</b>/🗑 — удалить.<br>
+    Текущий этаж: <b>${escapeHtml(floors[currentFloorIdx].name)}</b>
   </div>`;
   BUILDINGS.forEach((b,idx)=>{
     const wrap=document.createElement('div');
@@ -1231,7 +1437,7 @@ function renderEditPanel(){
     const cnt=Object.values(stalls).filter(s=>s.building===b.id).length;
     wrap.innerHTML=`
       <div class="ep-bld-head">
-        <span>${b.id} — ${b.label.split('—')[1]||b.label}</span>
+        <span>${b.id} — ${(b.label.split('—')[1]||b.label).trim()}</span>
         <span class="ep-count" data-count="${b.id}">${cnt} прилавков</span>
       </div>
       <div class="ep-bld-body">
@@ -1279,72 +1485,97 @@ function onConfigChange(e){
     else if(field==='ay') b.stallArea.y=v;
     else if(field==='aw') b.stallArea.w=v;
     else if(field==='ah') b.stallArea.h=v;
-    // обновить текст кнопки перегенерации
     const btn=document.querySelector(`button[onclick="regenerateGridFor('${b.id}')"]`);
     if(btn) btn.textContent=`🎲 Перегенерировать сетку (${b.rows}×${b.cols} = ${b.rows*b.cols} мест)`;
   }
-  saveConfig();
+  saveAll();
   buildSVG();
 }
 
 function regenerateGridFor(bid){
   const b=BUILDINGS.find(x=>x.id===bid);
   const cnt=Object.values(stalls).filter(s=>s.building===bid).length;
-  if(cnt>0){
-    if(!confirm(`Заменить ${cnt} прилавков в ${bid} на новую сетку ${b.rows}×${b.cols}? Данные арендаторов в этих прилавках будут потеряны.`)) return;
-  }
+  if(cnt>0 && !confirm(`Заменить ${cnt} прилавков в ${bid} на новую сетку ${b.rows}×${b.cols} (на ${floors[currentFloorIdx].name})? Данные арендаторов будут потеряны.`)) return;
   generateGrid(bid, true);
-  saveStalls();
-  pushHistory();
-  buildSVG();
-  updateStats();
-  renderEditPanel();
+  saveAll(); pushHistory();
+  buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
 }
 
 function renumberBuilding(bid){
   const entries=Object.entries(stalls).filter(([_,s])=>s.building===bid);
-  if(entries.length===0){alert(`В ${bid} нет прилавков.`);return;}
+  if(entries.length===0){alert(`В ${bid} нет прилавков на ${floors[currentFloorIdx].name}.`);return;}
   const prefix=prompt(`Префикс для нумерации в ${bid}:`, bid);
   if(prefix===null) return;
   const startStr=prompt('Начать с номера:', '1');
   if(startStr===null) return;
   const start=parseInt(startStr,10);
   if(isNaN(start)||start<0){alert('Некорректный номер.');return;}
-  const padStr=prompt('Сколько знаков в номере (для лидирующих нулей, напр. 3 → 001):', '3');
+  const padStr=prompt('Сколько знаков в номере:', '3');
   const pad=Math.max(1, parseInt(padStr,10)||3);
 
-  // сортировка по позиции: ряды (по Y) сверху вниз, в ряду — слева направо
   const sorted=entries.map(([id,s])=>({id,s})).sort((a,b)=>{
     if(Math.abs(a.s.y-b.s.y)<=15) return a.s.x-b.s.x;
     return a.s.y-b.s.y;
   });
-
-  // собрать новые ID, проверить коллизии вне этого здания
   const newIds=sorted.map((_,i)=>`${prefix.trim()||bid}-${String(start+i).padStart(pad,'0')}`);
   const otherIds=new Set(Object.keys(stalls).filter(id=>!entries.some(([eid])=>eid===id)));
   for(const nid of newIds){
-    if(otherIds.has(nid)){alert(`Коллизия: ID "${nid}" уже используется вне здания ${bid}.`);return;}
+    if(otherIds.has(nid)){alert(`Коллизия: ID "${nid}" уже используется.`);return;}
   }
-
-  // применить
-  const newStalls={...stalls};
-  for(const [id] of entries) delete newStalls[id];
-  sorted.forEach((item,i)=>{newStalls[newIds[i]]={...item.s,building:bid};});
-  stalls=newStalls;
-  saveStalls();
-  pushHistory();
-  buildSVG();
-  updateStats();
-  renderEditPanel();
+  // удалим старые
+  for(const {id} of sorted) delete stalls[id];
+  // добавим новые
+  sorted.forEach((item,i)=>{stalls[newIds[i]]={...item.s,building:bid};});
+  saveAll(); pushHistory();
+  buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
   alert(`Перенумеровано ${entries.length} прилавков: ${newIds[0]} … ${newIds[newIds.length-1]}`);
 }
 
 function resetConfig(){
-  if(!confirm('Сбросить настройки и контуры зданий к исходным? (прилавки не трогаем)')) return;
-  localStorage.removeItem(CONFIG_KEY);
-  BUILDINGS=JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
-  renderEditPanel();
+  if(!confirm(`Сбросить настройки зданий на «${floors[currentFloorIdx].name}» к исходным? (прилавки не трогаем)`)) return;
+  const fresh=JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
+  BUILDINGS.length=0;
+  fresh.forEach(b=>BUILDINGS.push(b));
+  saveAll(); pushHistory();
+  renderEditPanel(); buildSVG();
+}
+
+// ═══════════════ ИСТОРИЯ ═══════════════
+function snapshot(){
+  return JSON.stringify({floors, currentFloorIdx});
+}
+function pushHistory(){
+  history.length=historyIdx+1;
+  history.push(snapshot());
+  if(history.length>HISTORY_MAX) history.shift();
+  historyIdx=history.length-1;
+  updateUndoBtns();
+}
+function restoreSnapshot(snapStr){
+  const s=JSON.parse(snapStr);
+  // полная замена floors
+  floors.length=0;
+  s.floors.forEach(f=>floors.push(f));
+  currentFloorIdx=Math.max(0,Math.min(s.currentFloorIdx, floors.length-1));
+  syncAliases();
+  saveAll();
+  if(selectedId && !stalls[selectedId]) closeSidebar();
+  if(editSelectedId){
+    const exists=editSelectedType==='stall'?!!stalls[editSelectedId]:(editSelectedType==='passage'?passages.some(p=>p.id===editSelectedId):flows.some(p=>p.id===editSelectedId));
+    if(!exists){editSelectedId=null;editSelectedType=null;}
+  }
+  renderFloorTabs();
+  if(editMode) renderEditPanel();
   buildSVG();
+  updateStats();
+  updateUndoBtns();
+}
+function undo(){if(historyIdx<=0)return;historyIdx--;restoreSnapshot(history[historyIdx]);}
+function redo(){if(historyIdx>=history.length-1)return;historyIdx++;restoreSnapshot(history[historyIdx]);}
+function updateUndoBtns(){
+  const u=document.getElementById('btn-undo'), r=document.getElementById('btn-redo');
+  if(u) u.disabled=historyIdx<=0;
+  if(r) r.disabled=historyIdx>=history.length-1;
 }
 
 // ═══════════════ СОБЫТИЯ ═══════════════
@@ -1355,15 +1586,12 @@ function bindEvents(){
   document.addEventListener('mouseup',onDocMouseUp);
   svg.addEventListener('contextmenu',onSvgContextMenu);
   svg.addEventListener('dblclick',onSvgDblClick);
-
-  // делегирование клика и hover на прилавки
   svg.addEventListener('click',onStallClick);
   svg.addEventListener('mouseover',e=>{
-    if(e.target.dataset && e.target.dataset.kind==='stall' && !editMode) onStallEnter(e);
+    const kind=e.target.dataset && e.target.dataset.kind;
+    if((kind==='stall'||kind==='flow') && (!editMode || currentTool==='pointer')) onStallEnter(e);
   });
-  svg.addEventListener('mouseout',e=>{
-    if(e.target.dataset && e.target.dataset.kind==='stall') onStallLeave();
-  });
+  svg.addEventListener('mouseout',e=>{onStallLeave();});
   svg.addEventListener('mousemove',e=>{
     if(document.getElementById('tooltip').style.display==='block') moveTooltip(e);
   });
@@ -1371,12 +1599,13 @@ function bindEvents(){
 
 // ═══════════════ BOOT ═══════════════
 loadAll();
-migrateStallPositions();
 ensureInitial();
+migrateStallPositions();
+renderFloorTabs();
 buildSVG();
 bindEvents();
 updateStats();
-pushHistory();  // начальный снапшот — чтобы было куда возвращаться
+pushHistory(); // начальный снапшот
 </script>
 
 </body>
