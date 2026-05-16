@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>План</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0d1b2a;color:#e0e6f0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -185,7 +186,7 @@
   <button class="btn btn-icon" id="btn-undo" onclick="undo()" title="Отменить (Cmd+Z)" disabled>↶</button>
   <button class="btn btn-icon" id="btn-redo" onclick="redo()" title="Повторить (Cmd+Shift+Z)" disabled>↷</button>
   <button class="btn btn-success" onclick="toggleEdit()" id="btn-edit">⚙ Режим редактирования</button>
-  <button class="btn" onclick="exportCSV()">⬇ CSV</button>
+  <button class="btn" onclick="exportXLSX()">⬇ Excel</button>
   <button class="btn btn-danger" onclick="clearAll()">✕ Очистить</button>
 </div>
 
@@ -1322,32 +1323,43 @@ function updateStats(){
   document.getElementById('progress-fill').style.width=(total?filled/total*100:0)+'%';
 }
 
-function exportCSV(){
-  const rows=[];
-  // прилавки по всем этажам
-  rows.push(['Этаж','ID','Корпус','X','Y','W','H','Арендатор','Категория','Важность','Аренда ₽/мес','Оборот ₽/мес','Контракт до','Заметки']);
+function exportXLSX(){
+  if(typeof XLSX==='undefined'){
+    alert('Библиотека Excel не загрузилась (проверь интернет). Попробуй обновить страницу.');
+    return;
+  }
+  const wb=XLSX.utils.book_new();
+  const num=v=>{const n=Number(v); return isNaN(n)?0:n;};
+
+  // ── Лист 1: Прилавки ──
+  const stallRows=[['Этаж','ID','Корпус','X','Y','W','H','Арендатор','Категория','Важность','Аренда ₽/мес','Оборот ₽/мес','Контракт до','Заметки']];
   for(const fl of floors){
     const ids=Object.keys(fl.stalls).sort();
     for(const id of ids){
       const d=fl.stalls[id];
-      rows.push([fl.name, id, d.building||'', d.x, d.y, d.w, d.h, d.tenant||'', d.category||'', d.importance||'', d.rent||'', d.revenue||'', d.contract||'', d.notes||'']);
+      stallRows.push([fl.name, id, d.building||'', num(d.x), num(d.y), num(d.w), num(d.h),
+        d.tenant||'', d.category||'', d.importance||'',
+        num(d.rent), num(d.revenue), d.contract||'', d.notes||'']);
     }
   }
+  const ws1=XLSX.utils.aoa_to_sheet(stallRows);
+  ws1['!cols']=[{wch:10},{wch:12},{wch:8},{wch:6},{wch:6},{wch:6},{wch:6},{wch:28},{wch:22},{wch:8},{wch:13},{wch:13},{wch:12},{wch:30}];
+  ws1['!freeze']={xSplit:0,ySplit:1};
+  XLSX.utils.book_append_sheet(wb, ws1, 'Прилавки');
 
-  // потоки
-  rows.push([]);
-  rows.push(['ПЕШЕХОДНЫЕ ПОТОКИ']);
-  rows.push(['Этаж','ID','Чел/час','Точек','Координаты (x;y | x;y | ...)']);
+  // ── Лист 2: Пешеходные потоки ──
+  const flowRows=[['Этаж','ID','Чел/час','Точек','Координаты (x;y | x;y | ...)']];
   for(const fl of floors){
     for(const f of fl.flows){
-      rows.push([fl.name, f.id, f.count||0, f.points.length, f.points.map(p=>p.join(';')).join(' | ')]);
+      flowRows.push([fl.name, f.id, num(f.count), f.points.length, f.points.map(p=>p.join(';')).join(' | ')]);
     }
   }
+  const ws2=XLSX.utils.aoa_to_sheet(flowRows);
+  ws2['!cols']=[{wch:10},{wch:14},{wch:10},{wch:8},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Потоки');
 
-  // сводка по корпусам — на каждом этаже
-  rows.push([]);
-  rows.push(['СВОДКА ПО КОРПУСАМ']);
-  rows.push(['Этаж','Корпус','Название','Прилавков','Заполнено','Аренда ₽/мес','Оборот ₽/мес','Ср. аренда','Ср. оборот','Доходность %','A','B','C','D','Пустые']);
+  // ── Лист 3: Сводка по корпусам ──
+  const sumRows=[['Этаж','Корпус','Название','Прилавков','Заполнено','Аренда ₽/мес','Оборот ₽/мес','Ср. аренда','Ср. оборот','Доходность %','A','B','C','D','Пустые']];
   let GtCount=0,GtFilled=0,GtRent=0,GtRev=0,GtA=0,GtB=0,GtC=0,GtD=0,GtEmpty=0;
   for(const fl of floors){
     const groups={};
@@ -1364,55 +1376,67 @@ function exportCSV(){
       const name=bld?bld.label:'(вне зданий)';
       const count=list.length;
       const filled=list.filter(s=>s.tenant||s.importance).length;
-      const sumRent=list.reduce((a,s)=>a+(+s.rent||0),0);
-      const sumRev=list.reduce((a,s)=>a+(+s.revenue||0),0);
+      const sumRent=list.reduce((a,s)=>a+num(s.rent),0);
+      const sumRev=list.reduce((a,s)=>a+num(s.revenue),0);
       const a=list.filter(s=>s.importance==='A').length;
       const b=list.filter(s=>s.importance==='B').length;
       const c=list.filter(s=>s.importance==='C').length;
       const d=list.filter(s=>s.importance==='D').length;
       const empty=count-filled;
       const yieldPct=sumRev?Math.round(sumRent/sumRev*1000)/10:0;
-      rows.push([fl.name, bid, name, count, filled, sumRent, sumRev, filled?Math.round(sumRent/filled):0, filled?Math.round(sumRev/filled):0, yieldPct, a,b,c,d,empty]);
-      tCount+=count;tFilled+=filled;tRent+=sumRent;tRev+=sumRev;tA+=a;tB+=b;tC+=c;tD+=d;tEmpty+=empty;
+      sumRows.push([fl.name, bid, name, count, filled, sumRent, sumRev,
+        filled?Math.round(sumRent/filled):0, filled?Math.round(sumRev/filled):0,
+        yieldPct, a,b,c,d,empty]);
+      tCount+=count;tFilled+=filled;tRent+=sumRent;tRev+=sumRev;
+      tA+=a;tB+=b;tC+=c;tD+=d;tEmpty+=empty;
     }
-    rows.push([fl.name,'ИТОГО','—',tCount,tFilled,tRent,tRev,tFilled?Math.round(tRent/tFilled):0,tFilled?Math.round(tRev/tFilled):0,tRev?Math.round(tRent/tRev*1000)/10:0,tA,tB,tC,tD,tEmpty]);
-    GtCount+=tCount;GtFilled+=tFilled;GtRent+=tRent;GtRev+=tRev;GtA+=tA;GtB+=tB;GtC+=tC;GtD+=tD;GtEmpty+=tEmpty;
+    sumRows.push([fl.name,'ИТОГО','—',tCount,tFilled,tRent,tRev,
+      tFilled?Math.round(tRent/tFilled):0,tFilled?Math.round(tRev/tFilled):0,
+      tRev?Math.round(tRent/tRev*1000)/10:0, tA,tB,tC,tD,tEmpty]);
+    GtCount+=tCount;GtFilled+=tFilled;GtRent+=tRent;GtRev+=tRev;
+    GtA+=tA;GtB+=tB;GtC+=tC;GtD+=tD;GtEmpty+=tEmpty;
   }
-  rows.push(['ВСЕ ЭТАЖИ','ВСЕГО','—',GtCount,GtFilled,GtRent,GtRev,GtFilled?Math.round(GtRent/GtFilled):0,GtFilled?Math.round(GtRev/GtFilled):0,GtRev?Math.round(GtRent/GtRev*1000)/10:0,GtA,GtB,GtC,GtD,GtEmpty]);
+  sumRows.push(['ВСЕ ЭТАЖИ','ВСЕГО','—',GtCount,GtFilled,GtRent,GtRev,
+    GtFilled?Math.round(GtRent/GtFilled):0,GtFilled?Math.round(GtRev/GtFilled):0,
+    GtRev?Math.round(GtRent/GtRev*1000)/10:0, GtA,GtB,GtC,GtD,GtEmpty]);
+  const ws3=XLSX.utils.aoa_to_sheet(sumRows);
+  ws3['!cols']=[{wch:10},{wch:8},{wch:32},{wch:11},{wch:11},{wch:14},{wch:14},{wch:11},{wch:11},{wch:13},{wch:5},{wch:5},{wch:5},{wch:5},{wch:8}];
+  ws3['!freeze']={xSplit:0,ySplit:1};
+  XLSX.utils.book_append_sheet(wb, ws3, 'Сводка по корпусам');
 
-  // сводка по категориям (всем этажам вместе)
-  rows.push([]);
-  rows.push(['СВОДКА ПО КАТЕГОРИЯМ (все этажи)']);
-  rows.push(['Категория','Прилавков','Аренда ₽/мес','Оборот ₽/мес','Доля оборота %']);
+  // ── Лист 4: Сводка по категориям ──
+  const catRows=[['Категория','Прилавков','Аренда ₽/мес','Оборот ₽/мес','Доля оборота %']];
   const catGroups={};
   for(const fl of floors) for(const s of Object.values(fl.stalls)){
     if(!s.category)continue;
     (catGroups[s.category]=catGroups[s.category]||[]).push(s);
   }
-  const catSorted=Object.entries(catGroups).sort((a,b)=>b[1].reduce((x,s)=>x+(+s.revenue||0),0)-a[1].reduce((x,s)=>x+(+s.revenue||0),0));
-  const totalCatRev=catSorted.reduce((a,[_,l])=>a+l.reduce((x,s)=>x+(+s.revenue||0),0),0)||1;
+  const catSorted=Object.entries(catGroups).sort((a,b)=>
+    b[1].reduce((x,s)=>x+num(s.revenue),0)-a[1].reduce((x,s)=>x+num(s.revenue),0));
+  const totalCatRev=catSorted.reduce((a,[_,l])=>a+l.reduce((x,s)=>x+num(s.revenue),0),0)||1;
   for(const [cat,list] of catSorted){
-    const sumRent=list.reduce((a,s)=>a+(+s.rent||0),0);
-    const sumRev=list.reduce((a,s)=>a+(+s.revenue||0),0);
-    rows.push([cat, list.length, sumRent, sumRev, Math.round(sumRev/totalCatRev*1000)/10]);
+    const sumRent=list.reduce((a,s)=>a+num(s.rent),0);
+    const sumRev=list.reduce((a,s)=>a+num(s.revenue),0);
+    catRows.push([cat, list.length, sumRent, sumRev, Math.round(sumRev/totalCatRev*1000)/10]);
   }
+  const ws4=XLSX.utils.aoa_to_sheet(catRows);
+  ws4['!cols']=[{wch:32},{wch:11},{wch:14},{wch:14},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws4, 'Категории');
 
-  // ; как разделитель — стандарт для русской/европейской локали Excel.
-  // Числа отдаём без кавычек, чтобы Excel считал их числами.
-  function cell(v){
-    if(v==null||v==='') return '';
-    if(typeof v==='number') return String(v).replace('.', ',');
-    const s=String(v);
-    if(/^-?\d+([.,]\d+)?$/.test(s)) return s.replace('.', ',');
-    return '"'+s.replace(/"/g,'""')+'"';
+  // ── Лист 5: Этажи (метаданные) ──
+  const floorRows=[['Этаж','Прилавков','Проходов','Потоков','Заполнено','Общая аренда ₽/мес','Общий оборот ₽/мес']];
+  for(const fl of floors){
+    const stallsArr=Object.values(fl.stalls);
+    const filled=stallsArr.filter(s=>s.tenant||s.importance).length;
+    const rent=stallsArr.reduce((a,s)=>a+num(s.rent),0);
+    const rev=stallsArr.reduce((a,s)=>a+num(s.revenue),0);
+    floorRows.push([fl.name, stallsArr.length, fl.passages.length, fl.flows.length, filled, rent, rev]);
   }
-  // sep=; — подсказка Excel'ю, что разделитель ; (на Mac работает не во всех версиях, но не мешает Numbers)
-  const csv='sep=;\n'+rows.map(r=>r.map(cell).join(';')).join('\n');
-  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`yarmarka-audit-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
+  const ws5=XLSX.utils.aoa_to_sheet(floorRows);
+  ws5['!cols']=[{wch:16},{wch:11},{wch:11},{wch:10},{wch:11},{wch:18},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws5, 'Этажи');
+
+  XLSX.writeFile(wb, `yarmarka-audit-${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 function clearAll(){
