@@ -1556,10 +1556,7 @@ function toggleEdit(){
 
 function renderEditPanel(){
   const body=document.getElementById('ep-body');
-  body.innerHTML=`<div class="ep-hint">
-    Слева — палитра. <b>Прилавок</b>: клик. <b>Проход</b>: drag. <b>Поток</b>: клики добавляют точки, <kbd>Enter</kbd>/2× — закончить. <b>Контур</b>: жёлтые точки. <b>ПКМ</b>/🗑 — удалить.<br>
-    Текущий этаж: <b>${escapeHtml(floors[currentFloorIdx].name)}</b>
-  </div>`;
+  body.innerHTML=`<button class="btn btn-success" style="width:100%;margin-bottom:10px" onclick="addBuilding()">＋ Добавить корпус</button>`;
   BUILDINGS.forEach((b,idx)=>{
     const wrap=document.createElement('div');
     wrap.className='ep-bld'+(idx===0?' open':'');
@@ -1590,8 +1587,11 @@ function renderEditPanel(){
         </div>
         <button class="btn btn-success" style="width:100%;margin-top:4px" onclick="regenerateGridFor('${b.id}')">🎲 Перегенерировать сетку (${b.rows}×${b.cols} = ${b.rows*b.cols} мест)</button>
         <button class="btn" style="width:100%;margin-top:4px" onclick="renumberBuilding('${b.id}')">🔢 Перенумеровать прилавки (сверху-вниз, слева-направо)</button>
+        <div class="ep-section">Название</div>
+        <input class="inp" type="text" value="${escapeHtml(b.label||'')}" data-bid="${b.id}" data-field="label" placeholder="напр. С6 — Новый корпус">
         <div class="ep-section">Контур (SVG path)</div>
         <textarea class="inp" rows="3" style="font-size:10px;font-family:monospace" data-bid="${b.id}" data-field="path">${b.path}</textarea>
+        <button class="btn btn-danger" style="width:100%;margin-top:8px" onclick="deleteBuilding('${b.id}')">🗑 Удалить корпус ${b.id}</button>
       </div>`;
     body.appendChild(wrap);
     wrap.querySelector('.ep-bld-head').addEventListener('click',()=>wrap.classList.toggle('open'));
@@ -1608,6 +1608,8 @@ function onConfigChange(e){
     const v=e.target.value.trim();
     if(parsePath(v).length<3) return;
     b.path=v;
+  } else if(field==='label'){
+    b.label=e.target.value;
   } else {
     const v=parseFloat(e.target.value);
     if(isNaN(v))return;
@@ -1663,6 +1665,49 @@ async function renumberBuilding(bid){
   saveAll(); pushHistory();
   buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
   alert(`Перенумеровано ${entries.length} прилавков: ${newIds[0]} … ${newIds[newIds.length-1]}`);
+}
+
+function getNextBuildingId(){
+  const used=new Set(BUILDINGS.map(b=>b.id));
+  for(let i=1;i<200;i++){const id='C'+i; if(!used.has(id)) return id;}
+  return 'B'+Date.now();
+}
+
+function addBuilding(){
+  const id=getNextBuildingId();
+  // прямоугольник в свободной зоне (центр карты)
+  const cx=400, cy=720;
+  const w=200, h=130;
+  const x0=cx-w/2, y0=cy-h/2, x1=cx+w/2, y1=cy+h/2;
+  const newBld={
+    id,
+    label:`${id} — Новый корпус`,
+    sub:'',
+    path:`M ${x0} ${y0} L ${x1} ${y0} L ${x1} ${y1} L ${x0} ${y1} Z`,
+    labelXY:[x0+10, y0+20],
+    subXY:[x0+10, y0+34],
+    stallArea:{x:x0+10, y:y0+45, w:w-20, h:h-55},
+    rows:3, cols:4, gapX:3, gapY:3, area:0,
+  };
+  BUILDINGS.push(newBld);
+  saveAll(); pushHistory();
+  buildSVG(); renderEditPanel(); renderFloorTabs();
+}
+
+function deleteBuilding(bid){
+  const stallCount=Object.values(stalls).filter(s=>s.building===bid).length;
+  const msg=stallCount>0
+    ? `Удалить корпус ${bid} и все ${stallCount} прилавков в нём? Данные арендаторов будут потеряны.`
+    : `Удалить корпус ${bid}?`;
+  if(!confirm(msg)) return;
+  const idx=BUILDINGS.findIndex(b=>b.id===bid);
+  if(idx<0) return;
+  BUILDINGS.splice(idx,1);
+  for(const id of Object.keys(stalls)){
+    if(stalls[id].building===bid) delete stalls[id];
+  }
+  saveAll(); pushHistory();
+  buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
 }
 
 function resetConfig(){
