@@ -250,7 +250,7 @@
         </div>
       </div>
       <div class="fg"><label class="lbl">Аренда в месяц (₽)</label><input class="inp" id="f-rent" type="number" placeholder="0"></div>
-      <div class="fg"><label class="lbl">Оборот в месяц (₽, оценка)</label><input class="inp" id="f-revenue" type="number" placeholder="0"></div>
+      <div class="fg"><label class="lbl">Площадь павильона (м²)</label><input class="inp" id="f-area" type="number" step="0.1" min="0" placeholder="напр. 8.5"></div>
       <div class="fg"><label class="lbl">Контракт до</label><input class="inp" id="f-contract" type="date"></div>
       <div class="fg"><label class="lbl">Заметки</label><textarea class="inp" id="f-notes" placeholder="Наблюдения, риски, потенциал..."></textarea></div>
     </div>
@@ -1212,7 +1212,7 @@ function openStall(id){
   document.getElementById('f-tenant').value=s.tenant||'';
   document.getElementById('f-category').value=s.category||'';
   document.getElementById('f-rent').value=s.rent||'';
-  document.getElementById('f-revenue').value=s.revenue||'';
+  document.getElementById('f-area').value=s.area||'';
   document.getElementById('f-contract').value=s.contract||'';
   document.getElementById('f-notes').value=s.notes||'';
   currentImp=s.importance||'';
@@ -1239,7 +1239,7 @@ function saveStall(){
     category:document.getElementById('f-category').value,
     importance:currentImp,
     rent:document.getElementById('f-rent').value,
-    revenue:document.getElementById('f-revenue').value,
+    area:document.getElementById('f-area').value,
     contract:document.getElementById('f-contract').value,
     notes:document.getElementById('f-notes').value.trim(),
   });
@@ -1255,7 +1255,7 @@ function resetStallData(){
   const s=stalls[selectedId];
   if(s){
     delete s.tenant;delete s.category;delete s.importance;
-    delete s.rent;delete s.revenue;delete s.contract;delete s.notes;
+    delete s.rent;delete s.area;delete s.contract;delete s.notes;
     saveAll(); pushHistory();
   }
   buildSVG(); updateStats(); closeSidebar();
@@ -1294,7 +1294,7 @@ function onStallEnter(e){
     const id=tg.dataset.id; const data=stalls[id]||{};
     document.getElementById('tt-id').textContent=id;
     document.getElementById('tt-name').textContent=data.tenant||'(не заполнен)';
-    const parts=[data.category, data.revenue?`~${Number(data.revenue).toLocaleString('ru')} ₽/мес`:null].filter(Boolean);
+    const parts=[data.category, data.area?`${Number(data.area).toLocaleString('ru')} м²`:null, data.rent?`${Number(data.rent).toLocaleString('ru')} ₽/мес`:null].filter(Boolean);
     document.getElementById('tt-detail').textContent=parts.join(' · ');
     const impEl=document.getElementById('tt-imp');
     if(data.importance){
@@ -1349,14 +1349,14 @@ function exportXLSX(){
   const num=v=>{const n=Number(v); return isNaN(n)?0:n;};
 
   // ── Лист 1: Прилавки ──
-  const stallRows=[['Этаж','ID','Корпус','X','Y','W','H','Арендатор','Категория','Важность','Аренда ₽/мес','Оборот ₽/мес','Контракт до','Заметки']];
+  const stallRows=[['Этаж','ID','Корпус','X','Y','W','H','Арендатор','Категория','Важность','Аренда ₽/мес','Площадь м²','Контракт до','Заметки']];
   for(const fl of floors){
     const ids=Object.keys(fl.stalls).sort();
     for(const id of ids){
       const d=fl.stalls[id];
       stallRows.push([fl.name, id, d.building||'', num(d.x), num(d.y), num(d.w), num(d.h),
         d.tenant||'', d.category||'', d.importance||'',
-        num(d.rent), num(d.revenue), d.contract||'', d.notes||'']);
+        num(d.rent), num(d.area), d.contract||'', d.notes||'']);
     }
   }
   const ws1=XLSX.utils.aoa_to_sheet(stallRows);
@@ -1376,7 +1376,7 @@ function exportXLSX(){
   XLSX.utils.book_append_sheet(wb, ws2, 'Потоки');
 
   // ── Лист 3: Сводка по корпусам ──
-  const sumRows=[['Этаж','Корпус','Название','Площадь м²','Прилавков','Заполнено','Аренда ₽/мес','Оборот ₽/мес','Аренда ₽/м²','Оборот ₽/м²','Ср. аренда','Ср. оборот','Доходность %','A','B','C','D','Пустые']];
+  const sumRows=[['Этаж','Корпус','Название','Площадь корпуса м²','Прилавков','Заполнено','Сумма площадей прилавков м²','Утилизация %','Аренда ₽/мес','Аренда ₽/м² (по корпусу)','Аренда ₽/м² (по прилавкам)','Ср. аренда','A','B','C','D','Пустые']];
   let GtCount=0,GtFilled=0,GtRent=0,GtRev=0,GtA=0,GtB=0,GtC=0,GtD=0,GtEmpty=0;
   for(const fl of floors){
     const groups={};
@@ -1386,74 +1386,86 @@ function exportXLSX(){
     }
     const order=[...DEFAULT_BUILDINGS.map(b=>b.id),'X'];
     for(const bid of Object.keys(groups)) if(!order.includes(bid)) order.push(bid);
-    let tCount=0,tFilled=0,tRent=0,tRev=0,tArea=0,tA=0,tB=0,tC=0,tD=0,tEmpty=0;
+    let tCount=0,tFilled=0,tRent=0,tStallArea=0,tBldArea=0,tA=0,tB=0,tC=0,tD=0,tEmpty=0;
     for(const bid of order){
       const list=groups[bid];if(!list)continue;
       const bld=fl.buildings.find(x=>x.id===bid);
       const name=bld?bld.label:'(вне зданий)';
-      const area=bld?num(bld.area):0;
+      const bldArea=bld?num(bld.area):0;
       const count=list.length;
       const filled=list.filter(s=>s.tenant||s.importance).length;
       const sumRent=list.reduce((a,s)=>a+num(s.rent),0);
-      const sumRev=list.reduce((a,s)=>a+num(s.revenue),0);
+      const sumStallArea=list.reduce((a,s)=>a+num(s.area),0);
+      const util=bldArea?Math.round(sumStallArea/bldArea*1000)/10:0;
       const a=list.filter(s=>s.importance==='A').length;
       const b=list.filter(s=>s.importance==='B').length;
       const c=list.filter(s=>s.importance==='C').length;
       const d=list.filter(s=>s.importance==='D').length;
       const empty=count-filled;
-      const yieldPct=sumRev?Math.round(sumRent/sumRev*1000)/10:0;
-      sumRows.push([fl.name, bid, name, area, count, filled, sumRent, sumRev,
-        area?Math.round(sumRent/area):0, area?Math.round(sumRev/area):0,
-        filled?Math.round(sumRent/filled):0, filled?Math.round(sumRev/filled):0,
-        yieldPct, a,b,c,d,empty]);
-      tCount+=count;tFilled+=filled;tRent+=sumRent;tRev+=sumRev;tArea+=area;
+      sumRows.push([fl.name, bid, name, bldArea, count, filled,
+        Math.round(sumStallArea*10)/10, util,
+        sumRent,
+        bldArea?Math.round(sumRent/bldArea):0,
+        sumStallArea?Math.round(sumRent/sumStallArea):0,
+        filled?Math.round(sumRent/filled):0,
+        a,b,c,d,empty]);
+      tCount+=count;tFilled+=filled;tRent+=sumRent;
+      tStallArea+=sumStallArea;tBldArea+=bldArea;
       tA+=a;tB+=b;tC+=c;tD+=d;tEmpty+=empty;
     }
-    sumRows.push([fl.name,'ИТОГО','—',tArea,tCount,tFilled,tRent,tRev,
-      tArea?Math.round(tRent/tArea):0, tArea?Math.round(tRev/tArea):0,
-      tFilled?Math.round(tRent/tFilled):0,tFilled?Math.round(tRev/tFilled):0,
-      tRev?Math.round(tRent/tRev*1000)/10:0, tA,tB,tC,tD,tEmpty]);
-    GtCount+=tCount;GtFilled+=tFilled;GtRent+=tRent;GtRev+=tRev;
+    sumRows.push([fl.name,'ИТОГО','—',tBldArea,tCount,tFilled,
+      Math.round(tStallArea*10)/10, tBldArea?Math.round(tStallArea/tBldArea*1000)/10:0,
+      tRent,
+      tBldArea?Math.round(tRent/tBldArea):0,
+      tStallArea?Math.round(tRent/tStallArea):0,
+      tFilled?Math.round(tRent/tFilled):0,
+      tA,tB,tC,tD,tEmpty]);
+    GtCount+=tCount;GtFilled+=tFilled;GtRent+=tRent;
     GtA+=tA;GtB+=tB;GtC+=tC;GtD+=tD;GtEmpty+=tEmpty;
-    if(!window.__GtArea)window.__GtArea=0; window.__GtArea+=tArea;
+    if(!window.__GtBldArea)window.__GtBldArea=0; window.__GtBldArea+=tBldArea;
+    if(!window.__GtStallArea)window.__GtStallArea=0; window.__GtStallArea+=tStallArea;
   }
-  const GtArea=window.__GtArea||0; window.__GtArea=0;
-  sumRows.push(['ВСЕ ЭТАЖИ','ВСЕГО','—',GtArea,GtCount,GtFilled,GtRent,GtRev,
-    GtArea?Math.round(GtRent/GtArea):0, GtArea?Math.round(GtRev/GtArea):0,
-    GtFilled?Math.round(GtRent/GtFilled):0,GtFilled?Math.round(GtRev/GtFilled):0,
-    GtRev?Math.round(GtRent/GtRev*1000)/10:0, GtA,GtB,GtC,GtD,GtEmpty]);
+  const GtBldArea=window.__GtBldArea||0; window.__GtBldArea=0;
+  const GtStallArea=window.__GtStallArea||0; window.__GtStallArea=0;
+  sumRows.push(['ВСЕ ЭТАЖИ','ВСЕГО','—',GtBldArea,GtCount,GtFilled,
+    Math.round(GtStallArea*10)/10, GtBldArea?Math.round(GtStallArea/GtBldArea*1000)/10:0,
+    GtRent,
+    GtBldArea?Math.round(GtRent/GtBldArea):0,
+    GtStallArea?Math.round(GtRent/GtStallArea):0,
+    GtFilled?Math.round(GtRent/GtFilled):0,
+    GtA,GtB,GtC,GtD,GtEmpty]);
   const ws3=XLSX.utils.aoa_to_sheet(sumRows);
-  ws3['!cols']=[{wch:10},{wch:8},{wch:30},{wch:10},{wch:11},{wch:11},{wch:14},{wch:14},{wch:12},{wch:12},{wch:11},{wch:11},{wch:13},{wch:5},{wch:5},{wch:5},{wch:5},{wch:8}];
+  ws3['!cols']=[{wch:10},{wch:8},{wch:30},{wch:14},{wch:11},{wch:11},{wch:18},{wch:12},{wch:14},{wch:18},{wch:18},{wch:11},{wch:5},{wch:5},{wch:5},{wch:5},{wch:8}];
   ws3['!freeze']={xSplit:0,ySplit:1};
   XLSX.utils.book_append_sheet(wb, ws3, 'Сводка по корпусам');
 
   // ── Лист 4: Сводка по категориям ──
-  const catRows=[['Категория','Прилавков','Аренда ₽/мес','Оборот ₽/мес','Доля оборота %']];
+  const catRows=[['Категория','Прилавков','Площадь м²','Аренда ₽/мес','Доля площади %','Аренда ₽/м²']];
   const catGroups={};
   for(const fl of floors) for(const s of Object.values(fl.stalls)){
     if(!s.category)continue;
     (catGroups[s.category]=catGroups[s.category]||[]).push(s);
   }
   const catSorted=Object.entries(catGroups).sort((a,b)=>
-    b[1].reduce((x,s)=>x+num(s.revenue),0)-a[1].reduce((x,s)=>x+num(s.revenue),0));
-  const totalCatRev=catSorted.reduce((a,[_,l])=>a+l.reduce((x,s)=>x+num(s.revenue),0),0)||1;
+    b[1].reduce((x,s)=>x+num(s.area),0)-a[1].reduce((x,s)=>x+num(s.area),0));
+  const totalCatArea=catSorted.reduce((a,[_,l])=>a+l.reduce((x,s)=>x+num(s.area),0),0)||1;
   for(const [cat,list] of catSorted){
     const sumRent=list.reduce((a,s)=>a+num(s.rent),0);
-    const sumRev=list.reduce((a,s)=>a+num(s.revenue),0);
-    catRows.push([cat, list.length, sumRent, sumRev, Math.round(sumRev/totalCatRev*1000)/10]);
+    const sumArea=list.reduce((a,s)=>a+num(s.area),0);
+    catRows.push([cat, list.length, Math.round(sumArea*10)/10, sumRent, Math.round(sumArea/totalCatArea*1000)/10, sumArea?Math.round(sumRent/sumArea):0]);
   }
   const ws4=XLSX.utils.aoa_to_sheet(catRows);
-  ws4['!cols']=[{wch:32},{wch:11},{wch:14},{wch:14},{wch:14}];
+  ws4['!cols']=[{wch:32},{wch:11},{wch:13},{wch:14},{wch:14},{wch:13}];
   XLSX.utils.book_append_sheet(wb, ws4, 'Категории');
 
   // ── Лист 5: Этажи (метаданные) ──
-  const floorRows=[['Этаж','Прилавков','Проходов','Потоков','Заполнено','Общая аренда ₽/мес','Общий оборот ₽/мес']];
+  const floorRows=[['Этаж','Прилавков','Проходов','Потоков','Заполнено','Сумма площадей м²','Общая аренда ₽/мес']];
   for(const fl of floors){
     const stallsArr=Object.values(fl.stalls);
     const filled=stallsArr.filter(s=>s.tenant||s.importance).length;
     const rent=stallsArr.reduce((a,s)=>a+num(s.rent),0);
-    const rev=stallsArr.reduce((a,s)=>a+num(s.revenue),0);
-    floorRows.push([fl.name, stallsArr.length, fl.passages.length, fl.flows.length, filled, rent, rev]);
+    const ar=stallsArr.reduce((a,s)=>a+num(s.area),0);
+    floorRows.push([fl.name, stallsArr.length, fl.passages.length, fl.flows.length, filled, Math.round(ar*10)/10, rent]);
   }
   const ws5=XLSX.utils.aoa_to_sheet(floorRows);
   ws5['!cols']=[{wch:16},{wch:11},{wch:11},{wch:10},{wch:11},{wch:18},{wch:18}];
