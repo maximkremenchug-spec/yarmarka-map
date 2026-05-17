@@ -45,7 +45,8 @@
   .floor-add:hover{color:#fff;border-color:#fff}
 
   .main{flex:1;display:flex;overflow:hidden;position:relative}
-  .map-wrap{flex:1;overflow:auto;background:#0a1628;padding:30vh 30vw;display:flex;align-items:center;justify-content:center}
+  .map-wrap{flex:1;overflow:auto;background:#0a1628;display:flex;align-items:flex-start;justify-content:center;padding:20px}
+  .pan-area{display:flex;align-items:center;justify-content:center;min-width:100%;min-height:100%;padding:30vh 30vw}
   svg.ymap{display:block;filter:drop-shadow(0 6px 30px rgba(0,0,0,.6));user-select:none}
 
   .building-outline{fill:#142a47;stroke:#e94560;stroke-width:2.5;stroke-linejoin:round}
@@ -224,7 +225,9 @@
 
 <div class="main">
   <div class="map-wrap">
-    <svg class="ymap" id="ymap" width="800" height="950" viewBox="0 0 800 950" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="pan-area">
+      <svg class="ymap" id="ymap" width="800" height="950" viewBox="0 0 800 950" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
   </div>
 
   <div class="sidebar" id="sidebar">
@@ -737,6 +740,13 @@ function switchFloor(idx){
   saveAll();
   currentFloorIdx=idx;
   syncAliases();
+  // если у этажа пустые здания — восстановить из дефолта (либо скопировать с 1-го этажа)
+  if(!BUILDINGS || BUILDINGS.length===0){
+    const src = floors.find((f,i)=>i!==idx && f.buildings && f.buildings.length>0);
+    floors[idx].buildings = src ? JSON.parse(JSON.stringify(src.buildings)) : makeDefaultBuildings();
+    syncAliases();
+    saveAll();
+  }
   setTimeout(centerView, 30);
   selectionSet.clear();
   selectedId=null; closeSidebar();
