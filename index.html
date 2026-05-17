@@ -57,9 +57,9 @@
   .stall-rect.form-selected{filter:brightness(1.5);stroke-width:2!important}
   .stall-rect.edit-selected{filter:brightness(1.45);stroke:#ffe600!important;stroke-width:2.5!important}
 
-  .passage-rect{fill:rgba(140,200,240,.10);stroke:#3a6080;stroke-width:1;stroke-dasharray:4,3;cursor:pointer}
-  .passage-rect.edit-selected{stroke:#ffe600;stroke-width:2}
-  .passage-label{font-size:10px;fill:#5a7a98;font-style:italic;font-family:sans-serif;pointer-events:none;text-anchor:middle}
+  .passage-rect{stroke-width:1;cursor:pointer}
+  .passage-rect.edit-selected{stroke:#ffe600!important;stroke-width:2.5!important}
+  .passage-label{font-size:10px;font-style:italic;font-family:sans-serif;pointer-events:none;text-anchor:middle;font-weight:500}
 
   .flow-line{cursor:pointer;fill:none;transition:opacity .15s}
   .flow-line:hover{opacity:1!important;filter:brightness(1.2)}
@@ -205,7 +205,7 @@
 <div class="tool-palette" id="tool-palette">
   <button class="tool-btn active" data-tool="pointer" onclick="setTool('pointer')" title="Двигать / выделять"><span>🖱</span><span class="lbl">Двигать</span></button>
   <button class="tool-btn" data-tool="stall" onclick="setTool('stall')" title="Прилавок (клик)"><span>📦</span><span class="lbl">Прилавок</span></button>
-  <button class="tool-btn" data-tool="passage" onclick="setTool('passage')" title="Проход (drag)"><span>🛤</span><span class="lbl">Проход</span></button>
+  <button class="tool-btn" data-tool="passage" onclick="setTool('passage')" title="Зона: drag-прямоугольник, спросит тип"><span>🟦</span><span class="lbl">Зона</span></button>
   <button class="tool-btn" data-tool="flow" onclick="setTool('flow')" title="Пешеходный поток"><span>👥</span><span class="lbl">Поток</span></button>
   <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий"><span>⬡</span><span class="lbl">Контур</span></button>
   <div class="tool-divider"></div>
@@ -297,6 +297,19 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="zone-modal">
+  <div class="modal-card">
+    <div class="modal-msg">Тип зоны</div>
+    <select class="inp" id="zone-type" style="margin-bottom:8px;cursor:pointer"></select>
+    <input class="inp" id="zone-label-input" placeholder="Подпись (необязательно)">
+    <div class="modal-actions">
+      <button class="btn" id="zone-cancel">Отмена</button>
+      <button class="btn btn-danger" id="zone-delete" style="margin-right:auto;display:none">🗑 Удалить</button>
+      <button class="btn-save" id="zone-ok">OK</button>
+    </div>
+  </div>
+</div>
+
 <div id="tooltip">
   <div class="tt-id" id="tt-id"></div>
   <div class="tt-name" id="tt-name"></div>
@@ -317,7 +330,17 @@ const IMP_STROKE={A:'#27ae60',B:'#2980b9',C:'#ca6f1e',D:'#c0392b','':'#2a4a6b'};
 const IMP_LABELS={A:'A — трафик-генератор',B:'B — стабильный',C:'C — слабый',D:'D — проблемный'};
 const IMP_BG={A:'#0d2e1a',B:'#0d1e34',C:'#2e1c08',D:'#2e0d0d'};
 
-const TOOL_NAMES={pointer:'Двигать',stall:'Прилавок',passage:'Проход',flow:'Поток',vertex:'Контур',delete:'Удалить'};
+const TOOL_NAMES={pointer:'Двигать',stall:'Прилавок',passage:'Зона',flow:'Поток',vertex:'Контур',delete:'Удалить'};
+
+const ZONE_TYPES={
+  main:    {label:'Главная аллея',     fill:'rgba(52,152,219,.18)', stroke:'#3498db', dash:''},
+  service: {label:'Служебный коридор', fill:'rgba(127,140,141,.18)',stroke:'#95a5a6', dash:''},
+  stairs:  {label:'Лестница / лифт',   fill:'rgba(155,89,182,.25)', stroke:'#9b59b6', dash:''},
+  evac:    {label:'Эвакуация',         fill:'rgba(231,76,60,.18)',  stroke:'#e74c3c', dash:''},
+  wait:    {label:'Зона ожидания',     fill:'rgba(243,156,18,.18)', stroke:'#f39c12', dash:''},
+  reserve: {label:'Резерв / план',     fill:'rgba(46,204,113,.15)', stroke:'#2ecc71', dash:'6,4'},
+  dead:    {label:'Мёртвая зона',      fill:'rgba(120,120,130,.22)',stroke:'#7f8c8d', dash:'2,3'},
+};
 
 // ═══════════════ ШАБЛОН ЗДАНИЙ ═══════════════
 const DEFAULT_BUILDINGS=[
@@ -410,6 +433,43 @@ function myPrompt(msg, defaultVal='', opts={}){
     okBtn.onclick=()=>close(input.value);
     cancelBtn.onclick=()=>close(null);
     input.addEventListener('keydown',onKey);
+  });
+}
+
+// ── редактор зоны: возвращает {type,label} или 'delete' или null ──
+function editZone(defaultType='main', defaultLabel='', opts={}){
+  return new Promise(resolve=>{
+    if(modalOpen){resolve(null);return;}
+    modalOpen=true;
+    const overlay=document.getElementById('zone-modal');
+    const typeSel=document.getElementById('zone-type');
+    const lblInp=document.getElementById('zone-label-input');
+    const okBtn=document.getElementById('zone-ok');
+    const cancelBtn=document.getElementById('zone-cancel');
+    const delBtn=document.getElementById('zone-delete');
+    // заполнить select
+    typeSel.innerHTML=Object.entries(ZONE_TYPES).map(([k,v])=>`<option value="${k}" ${k===defaultType?'selected':''}>${v.label}</option>`).join('');
+    lblInp.value=defaultLabel||'';
+    delBtn.style.display=opts.canDelete?'inline-block':'none';
+    overlay.classList.add('show');
+    setTimeout(()=>{lblInp.focus();lblInp.select();},30);
+    const close=val=>{
+      modalOpen=false;
+      overlay.classList.remove('show');
+      okBtn.onclick=null;cancelBtn.onclick=null;delBtn.onclick=null;
+      lblInp.removeEventListener('keydown',onKey);
+      typeSel.removeEventListener('keydown',onKey);
+      resolve(val);
+    };
+    const onKey=e=>{
+      if(e.key==='Enter'){e.preventDefault();e.stopPropagation();close({type:typeSel.value,label:lblInp.value.trim()});}
+      else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(null);}
+    };
+    okBtn.onclick=()=>close({type:typeSel.value,label:lblInp.value.trim()});
+    cancelBtn.onclick=()=>close(null);
+    delBtn.onclick=()=>close('delete');
+    lblInp.addEventListener('keydown',onKey);
+    typeSel.addEventListener('keydown',onKey);
   });
 }
 
@@ -800,18 +860,25 @@ function renderStall(svg, id, s){
 }
 
 function renderPassage(svg, p){
-  const rect=el('rect',{
+  const t=ZONE_TYPES[p.type||'main']||ZONE_TYPES.main;
+  const attrs={
     id:`psg-${p.id}`,
     class:'passage-rect'+(editMode && editSelectedType==='passage' && editSelectedId===p.id ? ' edit-selected':''),
     x:p.x,y:p.y,width:p.w,height:p.h,rx:2,
+    fill:t.fill, stroke:t.stroke,
     'data-id':p.id,'data-kind':'passage',
-  });
-  svg.appendChild(rect);
-  if(p.label){
+  };
+  if(t.dash) attrs['stroke-dasharray']=t.dash;
+  svg.appendChild(el('rect',attrs));
+  // Подпись: своя ИЛИ название типа (если есть место)
+  const showLabel = p.label || (p.w>=60 && p.h>=22);
+  if(showLabel && p.w>=40){
+    const txt = p.label || t.label;
     svg.appendChild(el('text',{
       class:'passage-label',
-      x:p.x+p.w/2,y:p.y+p.h/2+3.5,
-    },p.label));
+      x:p.x+p.w/2, y:p.y+p.h/2+3.5,
+      fill: t.stroke,
+    }, txt));
   }
 }
 
@@ -1157,9 +1224,9 @@ function onDocMouseUp(e){
     const h=Math.abs(drawingPassage.y1-drawingPassage.y0);
     drawingPassage=null;
     if(w>=6&&h>=6){
-      myPrompt('Подпись прохода (можно пусто):', '').then(lbl=>{
-        if(lbl===null) return; // отмена — проход не создаём
-        passages.push({id:'P'+Date.now(),x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h),label:lbl||''});
+      editZone('main','').then(result=>{
+        if(!result || result==='delete') return;
+        passages.push({id:'P'+Date.now(),x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h),label:result.label||'',type:result.type||'main'});
         saveAll(); pushHistory(); buildSVG(); updateStats();
       });
     }
@@ -1198,6 +1265,26 @@ function onSvgDblClick(e){
   }
   if(currentTool==='vertex' && e.target.dataset && e.target.dataset.kind==='vertex'){
     insertVertex(e);
+    return;
+  }
+  // двойной клик по зоне — редактировать тип/подпись
+  if(currentTool==='pointer' && e.target.dataset && e.target.dataset.kind==='passage'){
+    e.preventDefault();
+    const id=e.target.dataset.id;
+    const p=passages.find(x=>x.id===id);
+    if(!p) return;
+    dragState=null;
+    editZone(p.type||'main', p.label||'', {canDelete:true}).then(result=>{
+      if(!result) return;
+      if(result==='delete'){
+        const idx=passages.findIndex(x=>x.id===id);
+        if(idx>=0){passages.splice(idx,1); saveAll(); pushHistory(); buildSVG(); updateStats();}
+        return;
+      }
+      p.type=result.type;
+      p.label=result.label;
+      saveAll(); pushHistory(); buildSVG();
+    });
     return;
   }
   // двойной клик по потоку в pointer tool — редактировать чел/час
@@ -1559,6 +1646,34 @@ function exportXLSX(){
   const ws4=XLSX.utils.aoa_to_sheet(catRows);
   ws4['!cols']=[{wch:32},{wch:11},{wch:13},{wch:14},{wch:14},{wch:13}];
   XLSX.utils.book_append_sheet(wb, ws4, 'Категории');
+
+  // ── Лист: Зоны ──
+  const zoneRows=[['Этаж','ID','Тип','Подпись','X','Y','Ширина','Высота']];
+  for(const fl of floors){
+    for(const p of (fl.passages||[])){
+      const t=ZONE_TYPES[p.type||'main']||ZONE_TYPES.main;
+      zoneRows.push([fl.name, p.id, t.label, p.label||'', num(p.x), num(p.y), num(p.w), num(p.h)]);
+    }
+  }
+  // сводка по типам зон
+  zoneRows.push([]);
+  zoneRows.push(['СВОДКА ПО ТИПАМ ЗОН']);
+  zoneRows.push(['Этаж','Тип зоны','Количество','Суммарная площадь по контуру (px²)']);
+  for(const fl of floors){
+    const byType={};
+    for(const p of (fl.passages||[])){
+      const tp=p.type||'main';
+      (byType[tp]=byType[tp]||[]).push(p);
+    }
+    for(const [tp,list] of Object.entries(byType)){
+      const t=ZONE_TYPES[tp]||ZONE_TYPES.main;
+      const totalPx=list.reduce((a,p)=>a+num(p.w)*num(p.h),0);
+      zoneRows.push([fl.name, t.label, list.length, totalPx]);
+    }
+  }
+  const wsZ=XLSX.utils.aoa_to_sheet(zoneRows);
+  wsZ['!cols']=[{wch:12},{wch:16},{wch:22},{wch:30},{wch:7},{wch:7},{wch:9},{wch:9}];
+  XLSX.utils.book_append_sheet(wb, wsZ, 'Зоны');
 
   // ── Лист 5: Этажи (метаданные) ──
   const floorRows=[['Этаж','Прилавков','Проходов','Потоков','Заполнено','Сумма площадей м²','Общая аренда ₽/мес']];
