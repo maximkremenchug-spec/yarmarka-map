@@ -391,8 +391,22 @@ let currentFloorIdx=0;
 let stalls={}, passages=[], BUILDINGS=[], flows=[];
 
 let selectedId=null;
-let editSelectedId=null;
-let editSelectedType=null;   // 'stall' | 'passage' | 'flow'
+// набор выделенных объектов: ключ "type:id"
+let selectionSet=new Set();
+let rubberBand=null;
+function selKey(t,id){return t+':'+id;}
+function isSelected(t,id){return selectionSet.has(selKey(t,id));}
+function selectionItems(){
+  return [...selectionSet].map(k=>{const i=k.indexOf(':');return{type:k.substr(0,i),id:k.substr(i+1)};});
+}
+function selectionSingle(){
+  if(selectionSet.size!==1)return null;
+  return selectionItems()[0];
+}
+function selectionAdd(t,id){selectionSet.add(selKey(t,id));}
+function selectionRemove(t,id){selectionSet.delete(selKey(t,id));}
+function selectionReplace(t,id){selectionSet.clear();selectionAdd(t,id);}
+function rectOverlap(a,b){return !(a.x+a.w<b.x||b.x+b.w<a.x||a.y+a.h<b.y||b.y+b.h<a.y);}
 let currentImp='';
 let editMode=false;
 let currentTool='pointer';
@@ -706,7 +720,7 @@ function switchFloor(idx){
   saveAll();
   currentFloorIdx=idx;
   syncAliases();
-  editSelectedId=null; editSelectedType=null;
+  selectionSet.clear();
   selectedId=null; closeSidebar();
   drawingFlow=null; drawingPassage=null;
   saveAll();
@@ -839,7 +853,7 @@ function renderStall(svg, id, s){
   const imp=s.importance||'';
   const rect=el('rect',{
     id:`stall-${id}`,
-    class:'stall-rect'+(editMode && editSelectedType==='stall' && editSelectedId===id ? ' edit-selected':'')+(!editMode && selectedId===id ? ' form-selected':''),
+    class:'stall-rect'+(editMode && isSelected('stall',id) ? ' edit-selected':'')+(!editMode && selectedId===id ? ' form-selected':''),
     x:s.x,y:s.y,width:s.w,height:s.h,
     fill:IMP_COLORS[imp],stroke:IMP_STROKE[imp],
     'stroke-width':.6,rx:1.5,
@@ -863,7 +877,7 @@ function renderPassage(svg, p){
   const t=ZONE_TYPES[p.type||'main']||ZONE_TYPES.main;
   const attrs={
     id:`psg-${p.id}`,
-    class:'passage-rect'+(editMode && editSelectedType==='passage' && editSelectedId===p.id ? ' edit-selected':''),
+    class:'passage-rect'+(editMode && isSelected('passage',p.id) ? ' edit-selected':''),
     x:p.x,y:p.y,width:p.w,height:p.h,rx:2,
     fill:t.fill, stroke:t.stroke,
     'data-id':p.id,'data-kind':'passage',
@@ -905,7 +919,7 @@ function renderFlow(svg, f){
   const pts=f.points;
   if(pts.length<2)return;
   const d='M '+pts.map(p=>p.join(' ')).join(' L ');
-  const sel=editMode && editSelectedType==='flow' && editSelectedId===f.id;
+  const sel=editMode && isSelected('flow',f.id);
   svg.appendChild(el('path',{
     id:`flow-${f.id}`,
     class:'flow-line'+(sel?' edit-selected':''),
@@ -980,28 +994,48 @@ function renderVertexHandles(svg){
 }
 
 function renderEditSelectionOverlays(svg){
-  if(!editSelectedId)return;
-  if(editSelectedType==='flow'){
-    const f=flows.find(p=>p.id===editSelectedId);
+  // рамка вокруг группы — если выделено больше одного
+  if(selectionSet.size>1){
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    for(const{type,id} of selectionItems()){
+      if(type==='stall'){const s=stalls[id]; if(!s)continue; minX=Math.min(minX,s.x); minY=Math.min(minY,s.y); maxX=Math.max(maxX,s.x+s.w); maxY=Math.max(maxY,s.y+s.h);}
+      else if(type==='passage'){const ps=passages.find(p=>p.id===id); if(!ps)continue; minX=Math.min(minX,ps.x); minY=Math.min(minY,ps.y); maxX=Math.max(maxX,ps.x+ps.w); maxY=Math.max(maxY,ps.y+ps.h);}
+      else if(type==='flow'){const f=flows.find(x=>x.id===id); if(!f)continue; for(const p of f.points){minX=Math.min(minX,p[0]); minY=Math.min(minY,p[1]); maxX=Math.max(maxX,p[0]); maxY=Math.max(maxY,p[1]);}}
+    }
+    if(minX<Infinity){
+      const pad=6;
+      svg.appendChild(el('rect',{
+        x:minX-pad, y:minY-pad,
+        width:maxX-minX+pad*2, height:maxY-minY+pad*2,
+        fill:'none', stroke:'#ffe600','stroke-width':1.2,
+        'stroke-dasharray':'5,3','pointer-events':'none',
+      }));
+      svg.appendChild(el('text',{
+        x:minX-pad+4, y:minY-pad-4,
+        'font-size':10, fill:'#ffe600','font-family':'sans-serif','font-weight':700,'pointer-events':'none',
+      }, `выделено: ${selectionSet.size}`));
+    }
+    return;
+  }
+  // одиночное выделение — вершины потока или ручка ресайза
+  const single=selectionSingle();
+  if(!single)return;
+  if(single.type==='flow'){
+    const f=flows.find(p=>p.id===single.id);
     if(!f)return;
     f.points.forEach((p,i)=>{
       svg.appendChild(el('circle',{
         cx:p[0],cy:p[1],r:5.5,
         fill:'#ffe600',stroke:'#000','stroke-width':1.5,
         style:'cursor:move',
-        'data-id':editSelectedId,'data-idx':i,'data-kind':'flow-vertex',
+        'data-id':single.id,'data-idx':i,'data-kind':'flow-vertex',
       }));
     });
     return;
   }
   let bbox=null;
-  if(editSelectedType==='stall'){
-    const obj=stalls[editSelectedId];
-    if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};
-  } else if(editSelectedType==='passage'){
-    const obj=passages.find(p=>p.id===editSelectedId);
-    if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};
-  }
+  if(single.type==='stall'){const obj=stalls[single.id]; if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};}
+  else if(single.type==='passage'){const obj=passages.find(p=>p.id===single.id); if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};}
   if(!bbox)return;
   svg.appendChild(el('rect',{
     id:'resize-handle',class:'resize-handle',
@@ -1034,10 +1068,10 @@ function setTool(tool){
   document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
   document.body.className=document.body.className.split(/\s+/).filter(c=>!c.startsWith('tool-')).join(' ')+' tool-'+tool;
   document.getElementById('cur-tool-name').textContent=TOOL_NAMES[tool];
-  editSelectedId=null; editSelectedType=null;
+  selectionSet.clear();
   if(drawingFlow && tool!=='flow'){drawingFlow=null;}
   if(drawingPassage && tool!=='passage'){drawingPassage=null;}
-  // снять фокус с кнопки, чтобы Enter не нажимал её
+  if(rubberBand){rubberBand=null; document.getElementById('rubber-band')?.remove();}
   if(document.activeElement && document.activeElement!==document.body) document.activeElement.blur();
   buildSVG();
 }
@@ -1059,39 +1093,35 @@ function onSvgMouseDown(e){
   }
 
   if(currentTool==='pointer'){
-    if(kind==='resize'){
-      e.preventDefault(); dragState={type:'resize'};
-    } else if(kind==='stall'){
+    if(kind==='resize'){e.preventDefault(); dragState={type:'resize'}; return;}
+    if(kind==='flow-vertex'){e.preventDefault(); dragState={type:'flow-vertex', id:tg.dataset.id, idx:+tg.dataset.idx, moved:false}; return;}
+
+    if(kind==='stall' || kind==='passage' || kind==='flow'){
       e.preventDefault();
       const id=tg.dataset.id;
-      editSelectedId=id; editSelectedType='stall';
-      const s=stalls[id];
-      dragState={type:'stall', id, offsetX:p.x-s.x, offsetY:p.y-s.y, moved:false, startX:p.x, startY:p.y};
+      if(e.shiftKey){
+        if(isSelected(kind,id)) selectionRemove(kind,id);
+        else selectionAdd(kind,id);
+        buildSVG();
+        return;
+      }
+      if(!isSelected(kind,id)) selectionReplace(kind,id);
+      // блочный drag всех выделенных
+      const origs=selectionItems().map(({type,id})=>{
+        if(type==='stall'){const s=stalls[id]; return s?{type,id,x:s.x,y:s.y}:null;}
+        if(type==='passage'){const ps=passages.find(p=>p.id===id); return ps?{type,id,x:ps.x,y:ps.y}:null;}
+        if(type==='flow'){const f=flows.find(x=>x.id===id); return f?{type,id,points:f.points.map(p=>[p[0],p[1]])}:null;}
+      }).filter(Boolean);
+      dragState={type:'block', startX:p.x, startY:p.y, origs, moved:false};
       buildSVG();
-    } else if(kind==='passage'){
-      e.preventDefault();
-      const id=tg.dataset.id;
-      editSelectedId=id; editSelectedType='passage';
-      const ps=passages.find(p=>p.id===id);
-      dragState={type:'passage', id, offsetX:p.x-ps.x, offsetY:p.y-ps.y, moved:false, startX:p.x, startY:p.y};
-      buildSVG();
-    } else if(kind==='flow'){
-      e.preventDefault();
-      const id=tg.dataset.id;
-      const f=flows.find(x=>x.id===id);
-      if(!f) return;
-      editSelectedId=id; editSelectedType='flow';
-      dragState={type:'flow', id,
-        startX:p.x, startY:p.y,
-        origPoints:f.points.map(pt=>[pt[0],pt[1]]),
-        moved:false};
-      buildSVG();
-    } else if(kind==='flow-vertex'){
-      e.preventDefault();
-      dragState={type:'flow-vertex', id:tg.dataset.id, idx:+tg.dataset.idx, moved:false};
-    } else {
-      if(editSelectedId){editSelectedId=null; editSelectedType=null; buildSVG();}
+      return;
     }
+
+    // mousedown по пустому — рамка выделения
+    e.preventDefault();
+    if(!e.shiftKey) selectionSet.clear();
+    rubberBand={x0:p.x, y0:p.y, x1:p.x, y1:p.y, prevSel:new Set(selectionSet)};
+    buildSVG();
     return;
   }
 
@@ -1102,7 +1132,7 @@ function onSvgMouseDown(e){
     const id=getNextStallId(bid);
     stalls[id]={x:Math.round(p.x-w/2),y:Math.round(p.y-h/2),w,h,building:bid};
     saveAll(); pushHistory();
-    editSelectedId=id; editSelectedType='stall';
+    selectionReplace('stall',id);
     buildSVG(); updateStats(); renderFloorTabs();
     return;
   }
@@ -1165,52 +1195,66 @@ function onDocMouseMove(e){
 
   if(dragState){
     const p=svgPoint(e);
-    if(dragState.type==='stall'){
-      const s=stalls[dragState.id];
-      const nx=Math.round(p.x-dragState.offsetX), ny=Math.round(p.y-dragState.offsetY);
-      if(!dragState.moved && (Math.abs(p.x-dragState.startX)>2||Math.abs(p.y-dragState.startY)>2)) dragState.moved=true;
-      s.x=nx; s.y=ny;
-      const rect=document.getElementById('stall-'+dragState.id);
-      if(rect){rect.setAttribute('x',nx);rect.setAttribute('y',ny);}
-      moveResizeHandle(s);
-    } else if(dragState.type==='passage'){
-      const ps=passages.find(p=>p.id===dragState.id);
-      ps.x=Math.round(p.x-dragState.offsetX);
-      ps.y=Math.round(p.y-dragState.offsetY);
-      if(!dragState.moved && (Math.abs(p.x-dragState.startX)>2||Math.abs(p.y-dragState.startY)>2)) dragState.moved=true;
-      buildSVG();
-    } else if(dragState.type==='flow'){
+    if(dragState.type==='block'){
       const dx=p.x-dragState.startX, dy=p.y-dragState.startY;
-      const f=flows.find(x=>x.id===dragState.id);
-      if(f){
-        f.points=dragState.origPoints.map(pt=>[Math.round(pt[0]+dx), Math.round(pt[1]+dy)]);
-        if(!dragState.moved && (Math.abs(dx)>2||Math.abs(dy)>2)) dragState.moved=true;
-        buildSVG();
+      for(const orig of dragState.origs){
+        if(orig.type==='stall'){const s=stalls[orig.id]; if(s){s.x=Math.round(orig.x+dx); s.y=Math.round(orig.y+dy);}}
+        else if(orig.type==='passage'){const ps=passages.find(p=>p.id===orig.id); if(ps){ps.x=Math.round(orig.x+dx); ps.y=Math.round(orig.y+dy);}}
+        else if(orig.type==='flow'){const f=flows.find(x=>x.id===orig.id); if(f){f.points=orig.points.map(pt=>[Math.round(pt[0]+dx), Math.round(pt[1]+dy)]);}}
       }
-    } else if(dragState.type==='flow-vertex'){
+      if(!dragState.moved && (Math.abs(dx)>2||Math.abs(dy)>2)) dragState.moved=true;
+      buildSVG();
+      return;
+    }
+    if(dragState.type==='flow-vertex'){
       const f=flows.find(x=>x.id===dragState.id);
       if(f){
         f.points[dragState.idx]=[Math.round(p.x), Math.round(p.y)];
         if(!dragState.moved) dragState.moved=true;
         buildSVG();
       }
-    } else if(dragState.type==='resize'){
-      if(editSelectedType==='stall'){
-        const s=stalls[editSelectedId];
+      return;
+    }
+    if(dragState.type==='resize'){
+      const single=selectionSingle();
+      if(!single) return;
+      if(single.type==='stall'){
+        const s=stalls[single.id];
         s.w=Math.max(8,Math.round(p.x-s.x));
         s.h=Math.max(8,Math.round(p.y-s.y));
-        const rect=document.getElementById('stall-'+editSelectedId);
+        const rect=document.getElementById('stall-'+single.id);
         if(rect){rect.setAttribute('width',s.w);rect.setAttribute('height',s.h);}
         moveResizeHandle(s);
-      } else if(editSelectedType==='passage'){
-        const ps=passages.find(p=>p.id===editSelectedId);
+      } else if(single.type==='passage'){
+        const ps=passages.find(p=>p.id===single.id);
         ps.w=Math.max(10,Math.round(p.x-ps.x));
         ps.h=Math.max(10,Math.round(p.y-ps.y));
         const rect=document.getElementById('psg-'+ps.id);
         if(rect){rect.setAttribute('width',ps.w);rect.setAttribute('height',ps.h);}
         moveResizeHandle(ps);
       }
+      if(!dragState.moved) dragState.moved=true;
+      return;
     }
+    return;
+  }
+
+  // rubber-band selection
+  if(rubberBand){
+    const p=svgPoint(e);
+    rubberBand.x1=p.x; rubberBand.y1=p.y;
+    let ghost=document.getElementById('rubber-band');
+    const svg=document.getElementById('ymap');
+    if(!ghost){
+      ghost=el('rect',{id:'rubber-band',fill:'rgba(255,230,0,.08)',stroke:'#ffe600','stroke-width':1,'stroke-dasharray':'4,3','pointer-events':'none'});
+      svg.appendChild(ghost);
+    }
+    const x=Math.min(rubberBand.x0,rubberBand.x1);
+    const y=Math.min(rubberBand.y0,rubberBand.y1);
+    const w=Math.abs(rubberBand.x1-rubberBand.x0);
+    const h=Math.abs(rubberBand.y1-rubberBand.y0);
+    ghost.setAttribute('x',x); ghost.setAttribute('y',y);
+    ghost.setAttribute('width',w); ghost.setAttribute('height',h);
     return;
   }
 
@@ -1247,9 +1291,30 @@ function onDocMouseMove(e){
 function onDocMouseUp(e){
   if(vertexDragging){saveAll(); pushHistory(); vertexDragging=null;}
   if(dragState){
-    const wasMoved=dragState.moved||dragState.type==='resize';
+    const wasMoved=dragState.moved;
     if(wasMoved){saveAll(); pushHistory();}
     dragState=null;
+  }
+  if(rubberBand){
+    document.getElementById('rubber-band')?.remove();
+    const x=Math.min(rubberBand.x0,rubberBand.x1);
+    const y=Math.min(rubberBand.y0,rubberBand.y1);
+    const w=Math.abs(rubberBand.x1-rubberBand.x0);
+    const h=Math.abs(rubberBand.y1-rubberBand.y0);
+    if(w>=3 && h>=3){
+      for(const [id,s] of Object.entries(stalls)){
+        if(rectOverlap({x:s.x,y:s.y,w:s.w,h:s.h},{x,y,w,h})) selectionAdd('stall',id);
+      }
+      for(const ps of passages){
+        if(rectOverlap({x:ps.x,y:ps.y,w:ps.w,h:ps.h},{x,y,w,h})) selectionAdd('passage',ps.id);
+      }
+      for(const f of flows){
+        const hit=f.points.some(pt=>pt[0]>=x && pt[0]<=x+w && pt[1]>=y && pt[1]<=y+h);
+        if(hit) selectionAdd('flow',f.id);
+      }
+    }
+    rubberBand=null;
+    buildSVG();
   }
   if(drawingPassage){
     const ghost=document.getElementById('passage-ghost');
@@ -1397,19 +1462,22 @@ document.addEventListener('keydown',e=>{
     return;
   }
   if(e.key==='Escape'){
-    editSelectedId=null;editSelectedType=null;
+    selectionSet.clear();
     if(drawingPassage){drawingPassage=null;document.getElementById('passage-ghost')?.remove();}
     if(drawingFlow){drawingFlow=null;document.getElementById('flow-pending')?.remove();}
+    if(rubberBand){rubberBand=null;document.getElementById('rubber-band')?.remove();}
     buildSVG();
   } else if(e.key==='Enter'){
     if(drawingFlow){e.preventDefault();finishFlow();}
-  } else if((e.key==='Delete'||e.key==='Backspace') && editSelectedId){
+  } else if((e.key==='Delete'||e.key==='Backspace') && selectionSet.size>0){
     if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-    if(editSelectedType==='stall'){delete stalls[editSelectedId];}
-    else if(editSelectedType==='passage'){const i=passages.findIndex(p=>p.id===editSelectedId);if(i>=0) passages.splice(i,1);}
-    else if(editSelectedType==='flow'){const i=flows.findIndex(p=>p.id===editSelectedId);if(i>=0) flows.splice(i,1);}
+    for(const {type,id} of selectionItems()){
+      if(type==='stall') delete stalls[id];
+      else if(type==='passage'){const i=passages.findIndex(p=>p.id===id);if(i>=0) passages.splice(i,1);}
+      else if(type==='flow'){const i=flows.findIndex(p=>p.id===id);if(i>=0) flows.splice(i,1);}
+    }
     saveAll(); pushHistory();
-    editSelectedId=null;editSelectedType=null;
+    selectionSet.clear();
     buildSVG();updateStats();renderFloorTabs();
   } else if((e.metaKey||e.ctrlKey) && (e.key==='z'||e.key==='Z'||e.key==='я'||e.key==='Я')){
     if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
@@ -1733,7 +1801,7 @@ function clearAll(){
   passages.length=0;
   flows.length=0;
   saveAll(); pushHistory();
-  editSelectedId=null;editSelectedType=null;selectedId=null;
+  selectionSet.clear();selectedId=null;
   closeSidebar();
   buildSVG();updateStats();renderFloorTabs();
 }
@@ -1745,7 +1813,7 @@ function toggleEdit(){
   document.getElementById('btn-edit').textContent=editMode?'✓ Выйти из редактирования':'⚙ Режим редактирования';
   document.getElementById('edit-panel').classList.toggle('open',editMode);
   if(editMode){renderEditPanel();setTool('pointer');}
-  else{editSelectedId=null;editSelectedType=null;drawingFlow=null;drawingPassage=null;}
+  else{selectionSet.clear();drawingFlow=null;drawingPassage=null;}
   buildSVG();
 }
 
@@ -1934,9 +2002,13 @@ function restoreSnapshot(snapStr){
   syncAliases();
   saveAll();
   if(selectedId && !stalls[selectedId]) closeSidebar();
-  if(editSelectedId){
-    const exists=editSelectedType==='stall'?!!stalls[editSelectedId]:(editSelectedType==='passage'?passages.some(p=>p.id===editSelectedId):flows.some(p=>p.id===editSelectedId));
-    if(!exists){editSelectedId=null;editSelectedType=null;}
+  // вычистить из выделения объекты, которые больше не существуют
+  for(const k of [...selectionSet]){
+    const i=k.indexOf(':'); const type=k.substr(0,i); const id=k.substr(i+1);
+    const exists = type==='stall' ? !!stalls[id]
+      : type==='passage' ? passages.some(p=>p.id===id)
+      : type==='flow' ? flows.some(x=>x.id===id) : false;
+    if(!exists) selectionSet.delete(k);
   }
   renderFloorTabs();
   if(editMode) renderEditPanel();
