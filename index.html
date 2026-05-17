@@ -45,9 +45,9 @@
   .floor-add:hover{color:#fff;border-color:#fff}
 
   .main{flex:1;display:flex;overflow:hidden;position:relative}
-  .map-wrap{flex:1;overflow:auto;background:#0a1628;display:flex;align-items:flex-start;justify-content:center;padding:20px}
-  .pan-area{display:flex;align-items:center;justify-content:center;min-width:100%;min-height:100%;padding:30vh 30vw}
-  .svg-sizer{position:relative;width:800px;height:950px;transition:none}
+  .map-wrap{flex:1;overflow:auto;background:#0a1628;display:flex;align-items:center;justify-content:center;padding:60px}
+  .pan-area{flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  .svg-sizer{position:relative;width:800px;height:950px;flex-shrink:0;margin:200px}
   svg.ymap{position:absolute;top:0;left:0;width:800px;height:950px;transform-origin:0 0}
   svg.ymap{display:block;filter:drop-shadow(0 6px 30px rgba(0,0,0,.6));user-select:none}
 
@@ -2280,6 +2280,9 @@ function bindEvents(){
   document.addEventListener('mouseup',onDocMouseUp);
   svg.addEventListener('contextmenu',onSvgContextMenu);
   svg.addEventListener('dblclick',onSvgDblClick);
+
+  // при изменении размера окна — рецентровать карту
+  window.addEventListener('resize', ()=>{ clearTimeout(window.__resizeTimer); window.__resizeTimer=setTimeout(centerView, 100); });
 
   // зум колесом с Ctrl/Cmd
   const wrap=document.querySelector('.map-wrap');
