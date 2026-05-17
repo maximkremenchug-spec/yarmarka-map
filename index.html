@@ -824,14 +824,21 @@ function setZoom(z, pivot){
     wrap.scrollTop  = pivot.worldY*zoom - pivot.localY;
   }
 }
-function zoomIn(){setZoom(zoom*1.25);}
-function zoomOut(){setZoom(zoom/1.25);}
-function zoomReset(){setZoom(1); centerView();}
+function zoomIn(){setZoom(zoom*1.25); setTimeout(centerView,30);}
+function zoomOut(){setZoom(zoom/1.25); setTimeout(centerView,30);}
+function zoomReset(){setZoom(1); setTimeout(centerView,30);}
+// центрирует видимый SVG в видимой части map-wrap (учитывает реальную позицию sizer)
 function centerView(){
   const wrap=document.querySelector('.map-wrap');
-  if(!wrap) return;
-  wrap.scrollLeft=(wrap.scrollWidth-wrap.clientWidth)/2;
-  wrap.scrollTop=(wrap.scrollHeight-wrap.clientHeight)/2;
+  const sizer=document.getElementById('svg-sizer');
+  if(!wrap||!sizer) return;
+  const wrapRect=wrap.getBoundingClientRect();
+  const sizerRect=sizer.getBoundingClientRect();
+  // позиция sizer внутри прокручиваемого контента wrap
+  const sizerX=sizerRect.left-wrapRect.left+wrap.scrollLeft;
+  const sizerY=sizerRect.top-wrapRect.top+wrap.scrollTop;
+  wrap.scrollLeft=sizerX+sizerRect.width/2-wrap.clientWidth/2;
+  wrap.scrollTop =sizerY+sizerRect.height/2-wrap.clientHeight/2;
 }
 
 // ─── PAN: пробел+drag или средняя кнопка мыши ───
