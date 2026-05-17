@@ -159,6 +159,10 @@
   .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
   .modal-actions .btn-save{flex:0 0 90px;padding:8px 14px}
 
+  /* pan mode (Space-drag) */
+  body.panning, body.panning .map-wrap, body.panning svg.ymap{cursor:grab!important}
+  body.panning.is-panning, body.panning.is-panning .map-wrap, body.panning.is-panning svg.ymap{cursor:grabbing!important}
+
   /* zoom controls */
   .zoom-ctrl{position:fixed;bottom:16px;right:20px;display:flex;gap:4px;align-items:center;z-index:4000;background:rgba(17,31,51,.92);border:1px solid #1e3a5f;border-radius:8px;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.5)}
   .zoom-ctrl button{width:34px;height:34px;background:#0a1628;border:1px solid #1e3a5f;color:#8ab0cc;border-radius:6px;cursor:pointer;font-size:16px;font-weight:bold;display:flex;align-items:center;justify-content:center;padding:0}
@@ -786,7 +790,7 @@ function el(tag,attrs,text){
 }
 // ─── ZOOM ───
 let zoom=1;
-const ZOOM_MIN=0.2, ZOOM_MAX=5;
+const ZOOM_MIN=0.15, ZOOM_MAX=15;
 function setZoom(z, pivot){
   z=Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
   if(Math.abs(z-zoom)<0.001) return;
@@ -803,9 +807,39 @@ function setZoom(z, pivot){
     wrap.scrollTop  = pivot.worldY*zoom - pivot.localY;
   }
 }
-function zoomIn(){setZoom(zoom*1.2);}
-function zoomOut(){setZoom(zoom/1.2);}
+function zoomIn(){setZoom(zoom*1.25);}
+function zoomOut(){setZoom(zoom/1.25);}
 function zoomReset(){setZoom(1);}
+
+// ─── PAN: пробел+drag или средняя кнопка мыши ───
+let panState=null;
+let spaceHeld=false;
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space' && !spaceHeld){
+    if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    e.preventDefault();
+    spaceHeld=true;
+    document.body.classList.add('panning');
+  }
+});
+document.addEventListener('keyup',e=>{
+  if(e.code==='Space'){
+    spaceHeld=false;
+    document.body.classList.remove('panning','is-panning');
+  }
+});
+function startPan(e){
+  const wrap=document.querySelector('.map-wrap');
+  panState={x:e.clientX, y:e.clientY, scrollX:wrap.scrollLeft, scrollY:wrap.scrollTop};
+  document.body.classList.add('is-panning');
+}
+function doPan(e){
+  if(!panState)return;
+  const wrap=document.querySelector('.map-wrap');
+  wrap.scrollLeft = panState.scrollX - (e.clientX-panState.x);
+  wrap.scrollTop  = panState.scrollY - (e.clientY-panState.y);
+}
+function endPan(){panState=null; document.body.classList.remove('is-panning');}
 
 function svgPoint(evt){
   const svg=document.getElementById('ymap');
@@ -1160,6 +1194,12 @@ function setTool(tool){
 
 // ═══════════════ МЫШЬ ═══════════════
 function onSvgMouseDown(e){
+  // средняя кнопка или Space-режим — pan
+  if(e.button===1 || spaceHeld){
+    e.preventDefault();
+    startPan(e);
+    return;
+  }
   if(e.button!==0)return;
   if(!editMode) return;
   const p=svgPoint(e);
@@ -1288,6 +1328,7 @@ function onSvgMouseDown(e){
 }
 
 function onDocMouseMove(e){
+  if(panState){doPan(e); return;}
   if(vertexDragging){
     const p=svgPoint(e);
     const x=Math.round(p.x),y=Math.round(p.y);
@@ -1316,14 +1357,15 @@ function onDocMouseMove(e){
         if(o.type==='stall'||o.type==='passage'){
           const target=o.type==='stall'?stalls[o.id]:passages.find(p=>p.id===o.id);
           if(!target)continue;
-          const nx=dragState.anchor.x+(o.x-dragState.anchor.x)*sx;
-          const ny=dragState.anchor.y+(o.y-dragState.anchor.y)*sy;
-          const nw=o.w*Math.abs(sx);
-          const nh=o.h*Math.abs(sy);
-          target.x=Math.round(sx<0?nx-nw:nx);
-          target.y=Math.round(sy<0?ny-nh:ny);
-          target.w=Math.max(1,Math.round(nw));
-          target.h=Math.max(1,Math.round(nh));
+          // считаем оба угла, потом округляем — края соседних прилавков точно совпадут
+          const x1=Math.round(dragState.anchor.x+(o.x-dragState.anchor.x)*sx);
+          const x2=Math.round(dragState.anchor.x+(o.x+o.w-dragState.anchor.x)*sx);
+          const y1=Math.round(dragState.anchor.y+(o.y-dragState.anchor.y)*sy);
+          const y2=Math.round(dragState.anchor.y+(o.y+o.h-dragState.anchor.y)*sy);
+          target.x=Math.min(x1,x2);
+          target.y=Math.min(y1,y2);
+          target.w=Math.max(1,Math.abs(x2-x1));
+          target.h=Math.max(1,Math.abs(y2-y1));
         } else if(o.type==='flow'){
           const f=flows.find(x=>x.id===o.id);
           if(!f)continue;
@@ -1460,6 +1502,7 @@ function onDocMouseMove(e){
 }
 
 function onDocMouseUp(e){
+  if(panState){endPan(); return;}
   if(vertexDragging){saveAll(); pushHistory(); vertexDragging=null;}
   if(dragState){
     const wasMoved=dragState.moved;
