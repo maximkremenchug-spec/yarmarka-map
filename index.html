@@ -882,6 +882,24 @@ function renderPassage(svg, p){
   }
 }
 
+function tangentAtMid(pts){
+  if(pts.length<2) return {dx:1,dy:0};
+  let total=0; const lens=[];
+  for(let i=1;i<pts.length;i++){
+    const l=Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
+    lens.push(l); total+=l;
+  }
+  const target=total/2;
+  let acc=0;
+  for(let i=0;i<lens.length;i++){
+    if(acc+lens[i]>=target){
+      return {dx:pts[i+1][0]-pts[i][0], dy:pts[i+1][1]-pts[i][1]};
+    }
+    acc+=lens[i];
+  }
+  return {dx:pts[pts.length-1][0]-pts[0][0], dy:pts[pts.length-1][1]-pts[0][1]};
+}
+
 function renderFlow(svg, f){
   const {w,color}=flowStyle(f.count);
   const pts=f.points;
@@ -907,11 +925,27 @@ function renderFlow(svg, f){
     points:`${last[0]},${last[1]} ${ax1},${ay1} ${ax2},${ay2}`,
     fill:color, opacity:0.95,'pointer-events':'none',
   }));
-  // подпись чел/ч — вдоль линии через <textPath>
+  // подпись чел/ч — вдоль линии. Авто-разворот: если линия идёт справа-налево
+  // (или почти вертикально вверх) — текст бы оказался вверх ногами. В этом случае
+  // подкладываем невидимый «реверсный» path и натягиваем текст на него.
+  const tan=tangentAtMid(pts);
+  const reverseLabel = tan.dx < -0.01 || (Math.abs(tan.dx) < 1.5 && tan.dy < 0);
+  let labelPathId=`flow-${f.id}`;
+  if(reverseLabel){
+    const revPts=pts.slice().reverse();
+    const revD='M '+revPts.map(p=>p.join(' ')).join(' L ');
+    svg.appendChild(el('path',{
+      id:`flow-rev-${f.id}`,
+      d:revD, fill:'none', stroke:'none','pointer-events':'none',
+    }));
+    labelPathId=`flow-rev-${f.id}`;
+  }
   const labelText=(f.count||0)+' чел/ч';
-  const textEl=el('text',{class:'flow-label','text-anchor':'middle',dy:-5});
+  // dy: на исходном пути -5 поднимает текст «над» линией в экранных координатах.
+  // На реверсном пути «над» = +5 (т.к. перпендикуляр инвертируется).
+  const textEl=el('text',{class:'flow-label','text-anchor':'middle',dy:reverseLabel?5:-5});
   const tp=document.createElementNS(NS,'textPath');
-  tp.setAttribute('href',`#flow-${f.id}`);
+  tp.setAttribute('href',`#${labelPathId}`);
   tp.setAttribute('startOffset','50%');
   tp.textContent=labelText;
   textEl.appendChild(tp);
