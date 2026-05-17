@@ -151,6 +151,14 @@
   .tt-name{color:#fff;margin-top:2px}
   .tt-detail{color:#7a9ab5;margin-top:2px;font-size:11px}
 
+  /* modal-prompt (нативный prompt отключён в Electron) */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(2px)}
+  .modal-overlay.show{display:flex}
+  .modal-card{background:#111f33;border:1px solid #2a5a8a;border-radius:10px;padding:20px;width:400px;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,.7)}
+  .modal-msg{font-size:13px;color:#e0e6f0;margin-bottom:12px;line-height:1.5}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  .modal-actions .btn-save{flex:0 0 90px;padding:8px 14px}
+
   /* info badge */
   .info-badge{position:fixed;bottom:16px;left:20px;background:rgba(17,31,51,.95);border:1px solid #2a5a8a;border-radius:8px;padding:8px 14px;font-size:11px;color:#8ab0cc;z-index:4000;display:none;line-height:1.5;max-width:380px}
   body.editing .info-badge{display:block}
@@ -278,6 +286,17 @@
   <kbd>ПКМ</kbd> — удалить · <kbd>Del</kbd>/<kbd>⌫</kbd> — удалить выделенный · <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd> — undo/redo
 </div>
 
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-msg" id="modal-msg"></div>
+    <input class="inp" id="modal-input" type="text">
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Отмена</button>
+      <button class="btn-save" id="modal-ok">OK</button>
+    </div>
+  </div>
+</div>
+
 <div id="tooltip">
   <div class="tt-id" id="tt-id"></div>
   <div class="tt-name" id="tt-name"></div>
@@ -358,6 +377,41 @@ let dragState=null;
 let drawingPassage=null;
 let drawingFlow=null;        // {points:[[x,y],...]}
 let vertexDragging=null;
+let modalOpen=false;
+
+// ── свой prompt (нативный отключён в Electron) ──
+function myPrompt(msg, defaultVal='', opts={}){
+  return new Promise(resolve=>{
+    if(modalOpen){resolve(null);return;}
+    modalOpen=true;
+    const overlay=document.getElementById('modal-overlay');
+    const msgEl=document.getElementById('modal-msg');
+    const input=document.getElementById('modal-input');
+    const okBtn=document.getElementById('modal-ok');
+    const cancelBtn=document.getElementById('modal-cancel');
+    msgEl.textContent=msg;
+    input.value=defaultVal==null?'':String(defaultVal);
+    input.type=opts.type||'text';
+    if(opts.placeholder) input.placeholder=opts.placeholder; else input.removeAttribute('placeholder');
+    overlay.classList.add('show');
+    setTimeout(()=>{input.focus();input.select();},30);
+    const close=val=>{
+      modalOpen=false;
+      overlay.classList.remove('show');
+      okBtn.onclick=null;
+      cancelBtn.onclick=null;
+      input.removeEventListener('keydown',onKey);
+      resolve(val);
+    };
+    const onKey=e=>{
+      if(e.key==='Enter'){e.preventDefault();e.stopPropagation();close(input.value);}
+      else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(null);}
+    };
+    okBtn.onclick=()=>close(input.value);
+    cancelBtn.onclick=()=>close(null);
+    input.addEventListener('keydown',onKey);
+  });
+}
 
 // история
 let history=[];
@@ -603,22 +657,23 @@ function switchFloor(idx){
 }
 
 function addFloor(){
-  const name=prompt('Название нового этажа:',`Этаж ${floors.length+1}`);
-  if(!name)return;
-  // копируем контуры зданий с текущего этажа (стены — те же на всех этажах)
-  const buildings=JSON.parse(JSON.stringify(floors[currentFloorIdx].buildings));
-  floors.push({name:name.trim(), stalls:{}, passages:[], buildings, flows:[]});
-  pushHistory();
-  switchFloor(floors.length-1);
+  myPrompt('Название нового этажа:',`Этаж ${floors.length+1}`).then(name=>{
+    if(!name)return;
+    const buildings=JSON.parse(JSON.stringify(floors[currentFloorIdx].buildings));
+    floors.push({name:name.trim(), stalls:{}, passages:[], buildings, flows:[]});
+    pushHistory();
+    switchFloor(floors.length-1);
+  });
 }
 
 function renameFloorPrompt(idx){
-  const name=prompt('Новое название этажа:', floors[idx].name);
-  if(!name) return;
-  floors[idx].name=name.trim();
-  pushHistory();
-  saveAll();
-  renderFloorTabs();
+  myPrompt('Новое название этажа:', floors[idx].name).then(name=>{
+    if(!name) return;
+    floors[idx].name=name.trim();
+    pushHistory();
+    saveAll();
+    renderFloorTabs();
+  });
 }
 
 function deleteFloorPrompt(idx){
@@ -864,9 +919,10 @@ function setTool(tool){
   document.body.className=document.body.className.split(/\s+/).filter(c=>!c.startsWith('tool-')).join(' ')+' tool-'+tool;
   document.getElementById('cur-tool-name').textContent=TOOL_NAMES[tool];
   editSelectedId=null; editSelectedType=null;
-  // отменить активные операции при смене инструмента
   if(drawingFlow && tool!=='flow'){drawingFlow=null;}
   if(drawingPassage && tool!=='passage'){drawingPassage=null;}
+  // снять фокус с кнопки, чтобы Enter не нажимал её
+  if(document.activeElement && document.activeElement!==document.body) document.activeElement.blur();
   buildSVG();
 }
 
@@ -908,15 +964,13 @@ function onSvgMouseDown(e){
       const id=tg.dataset.id;
       const f=flows.find(x=>x.id===id);
       editSelectedId=id; editSelectedType='flow';
-      // редактируем количество
-      const newCount=prompt(`Чел/час для потока «${id}»:`, f.count||0);
-      if(newCount!==null){
+      buildSVG();
+      myPrompt(`Чел/час для потока «${id}»:`, f.count||0, {type:'number'}).then(newCount=>{
+        if(newCount===null) return;
         const n=Math.max(0, parseInt(newCount,10)||0);
         f.count=n;
         saveAll(); pushHistory(); buildSVG(); updateStats();
-      } else {
-        buildSVG();
-      }
+      });
     } else {
       if(editSelectedId){editSelectedId=null; editSelectedType=null; buildSVG();}
     }
@@ -1071,12 +1125,14 @@ function onDocMouseUp(e){
     const y=Math.min(drawingPassage.y0,drawingPassage.y1);
     const w=Math.abs(drawingPassage.x1-drawingPassage.x0);
     const h=Math.abs(drawingPassage.y1-drawingPassage.y0);
-    if(w>=10&&h>=10){
-      const lbl=prompt('Подпись прохода (можно пусто):', '')||'';
-      passages.push({id:'P'+Date.now(),x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h),label:lbl});
-      saveAll(); pushHistory(); buildSVG(); updateStats();
-    }
     drawingPassage=null;
+    if(w>=6&&h>=6){
+      myPrompt('Подпись прохода (можно пусто):', '').then(lbl=>{
+        if(lbl===null) return; // отмена — проход не создаём
+        passages.push({id:'P'+Date.now(),x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h),label:lbl||''});
+        saveAll(); pushHistory(); buildSVG(); updateStats();
+      });
+    }
   }
 }
 
@@ -1117,17 +1173,18 @@ function onSvgDblClick(e){
 }
 
 function finishFlow(){
-  if(!drawingFlow){return;}
-  const pts=drawingFlow.points;
+  if(!drawingFlow || modalOpen)return;
+  const pts=drawingFlow.points.slice();
   if(pts.length<2){drawingFlow=null; document.getElementById('flow-pending')?.remove(); buildSVG(); return;}
-  const cnt=prompt('Количество человек в час на этом отрезке:', '500');
   document.getElementById('flow-pending')?.remove();
-  if(cnt===null){drawingFlow=null; buildSVG(); return;}
-  const count=Math.max(0, parseInt(cnt,10)||0);
-  flows.push({id:'F'+Date.now(), points:pts.slice(), count, label:''});
-  saveAll(); pushHistory();
-  drawingFlow=null;
-  buildSVG(); updateStats();
+  myPrompt('Количество человек в час на этом отрезке:', 500, {type:'number'}).then(cnt=>{
+    if(cnt===null){drawingFlow=null; buildSVG(); return;}
+    const count=Math.max(0, parseInt(cnt,10)||0);
+    flows.push({id:'F'+Date.now(), points:pts, count, label:''});
+    saveAll(); pushHistory();
+    drawingFlow=null;
+    buildSVG(); updateStats();
+  });
 }
 
 function moveResizeHandle(obj){
@@ -1263,17 +1320,18 @@ function resetStallData(){
 
 function renameStall(){
   if(!selectedId)return;
-  const newId=prompt(`Новый ID для ${selectedId}:`, selectedId);
-  if(!newId)return;
-  const trimmed=newId.trim();
-  if(!trimmed || trimmed===selectedId)return;
-  if(stalls[trimmed]){alert(`ID "${trimmed}" уже используется.`);return;}
-  stalls[trimmed]=stalls[selectedId];
-  delete stalls[selectedId];
-  selectedId=trimmed;
-  document.getElementById('sb-id').textContent=trimmed;
-  saveAll(); pushHistory();
-  buildSVG(); updateStats();
+  myPrompt(`Новый ID для ${selectedId}:`, selectedId).then(newId=>{
+    if(newId===null || !newId)return;
+    const trimmed=newId.trim();
+    if(!trimmed || trimmed===selectedId)return;
+    if(stalls[trimmed]){alert(`ID "${trimmed}" уже используется.`);return;}
+    stalls[trimmed]=stalls[selectedId];
+    delete stalls[selectedId];
+    selectedId=trimmed;
+    document.getElementById('sb-id').textContent=trimmed;
+    saveAll(); pushHistory();
+    buildSVG(); updateStats();
+  });
 }
 
 function flashSave(){
@@ -1578,16 +1636,17 @@ function regenerateGridFor(bid){
   buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
 }
 
-function renumberBuilding(bid){
+async function renumberBuilding(bid){
   const entries=Object.entries(stalls).filter(([_,s])=>s.building===bid);
   if(entries.length===0){alert(`В ${bid} нет прилавков на ${floors[currentFloorIdx].name}.`);return;}
-  const prefix=prompt(`Префикс для нумерации в ${bid}:`, bid);
+  const prefix=await myPrompt(`Префикс для нумерации в ${bid}:`, bid);
   if(prefix===null) return;
-  const startStr=prompt('Начать с номера:', '1');
+  const startStr=await myPrompt('Начать с номера:', '1', {type:'number'});
   if(startStr===null) return;
   const start=parseInt(startStr,10);
   if(isNaN(start)||start<0){alert('Некорректный номер.');return;}
-  const padStr=prompt('Сколько знаков в номере:', '3');
+  const padStr=await myPrompt('Сколько знаков в номере:', '3', {type:'number'});
+  if(padStr===null) return;
   const pad=Math.max(1, parseInt(padStr,10)||3);
 
   const sorted=entries.map(([id,s])=>({id,s})).sort((a,b)=>{
@@ -1599,9 +1658,7 @@ function renumberBuilding(bid){
   for(const nid of newIds){
     if(otherIds.has(nid)){alert(`Коллизия: ID "${nid}" уже используется.`);return;}
   }
-  // удалим старые
   for(const {id} of sorted) delete stalls[id];
-  // добавим новые
   sorted.forEach((item,i)=>{stalls[newIds[i]]={...item.s,building:bid};});
   saveAll(); pushHistory();
   buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
