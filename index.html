@@ -907,13 +907,15 @@ function renderFlow(svg, f){
     points:`${last[0]},${last[1]} ${ax1},${ay1} ${ax2},${ay2}`,
     fill:color, opacity:0.95,'pointer-events':'none',
   }));
-  // подпись чел/ч (на середине)
-  const mid=pts[Math.floor((pts.length-1)/2)];
-  const next=pts[Math.floor((pts.length-1)/2)+1]||mid;
-  const mx=(mid[0]+next[0])/2, my=(mid[1]+next[1])/2;
-  svg.appendChild(el('text',{
-    class:'flow-label', x:mx, y:my-8,'text-anchor':'middle',
-  }, (f.count||0)+' чел/ч'));
+  // подпись чел/ч — вдоль линии через <textPath>
+  const labelText=(f.count||0)+' чел/ч';
+  const textEl=el('text',{class:'flow-label','text-anchor':'middle',dy:-5});
+  const tp=document.createElementNS(NS,'textPath');
+  tp.setAttribute('href',`#flow-${f.id}`);
+  tp.setAttribute('startOffset','50%');
+  tp.textContent=labelText;
+  textEl.appendChild(tp);
+  svg.appendChild(textEl);
 }
 
 function renderFlowGhost(svg){
