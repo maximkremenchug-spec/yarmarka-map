@@ -520,7 +520,7 @@ function getNextStallId(prefix){
 // стиль потоковой линии в зависимости от количества чел/ч
 function flowStyle(count){
   const c=+count||0;
-  const w=Math.min(2.6, 0.5+c/700);   // совсем тонкие: 1 чел → 0.5px, 1500 → ~2.6px макс
+  const w=0.3;   // все линии одинаково тонкие — интенсивность кодируется цветом
   let color;
   if(c<200)        color='#3498db';
   else if(c<500)   color='#1abc9c';
