@@ -47,6 +47,8 @@
   .main{flex:1;display:flex;overflow:hidden;position:relative}
   .map-wrap{flex:1;overflow:auto;background:#0a1628;display:flex;align-items:flex-start;justify-content:center;padding:20px}
   .pan-area{display:flex;align-items:center;justify-content:center;min-width:100%;min-height:100%;padding:30vh 30vw}
+  .svg-sizer{position:relative;width:800px;height:950px;transition:none}
+  svg.ymap{position:absolute;top:0;left:0;width:800px;height:950px;transform-origin:0 0}
   svg.ymap{display:block;filter:drop-shadow(0 6px 30px rgba(0,0,0,.6));user-select:none}
 
   .building-outline{fill:#142a47;stroke:#e94560;stroke-width:2.5;stroke-linejoin:round}
@@ -226,7 +228,9 @@
 <div class="main">
   <div class="map-wrap">
     <div class="pan-area">
-      <svg class="ymap" id="ymap" width="800" height="950" viewBox="0 0 800 950" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="svg-sizer" id="svg-sizer">
+        <svg class="ymap" id="ymap" viewBox="0 0 800 950" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
     </div>
   </div>
 
@@ -806,14 +810,16 @@ function setZoom(z, pivot){
   z=Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
   if(Math.abs(z-zoom)<0.001) return;
   const wrap=document.querySelector('.map-wrap');
+  const sizer=document.getElementById('svg-sizer');
   const svg=document.getElementById('ymap');
   zoom=z;
-  svg.setAttribute('width', 800*zoom);
-  svg.setAttribute('height', 950*zoom);
+  // sizer задаёт layout-размер (для скроллбаров), SVG масштабируется CSS-transform'ом
+  sizer.style.width  = (800*zoom)+'px';
+  sizer.style.height = (950*zoom)+'px';
+  svg.style.transform = `scale(${zoom})`;
   const lbl=document.getElementById('zoom-pct');
   if(lbl) lbl.textContent=Math.round(zoom*100)+'%';
   if(pivot){
-    // удерживаем под курсором ту же точку карты
     wrap.scrollLeft = pivot.worldX*zoom - pivot.localX;
     wrap.scrollTop  = pivot.worldY*zoom - pivot.localY;
   }
