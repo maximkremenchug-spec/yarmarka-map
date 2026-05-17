@@ -45,7 +45,7 @@
   .floor-add:hover{color:#fff;border-color:#fff}
 
   .main{flex:1;display:flex;overflow:hidden;position:relative}
-  .map-wrap{flex:1;overflow:auto;background:#0a1628;padding:80vh 80vw;display:flex;align-items:center;justify-content:center}
+  .map-wrap{flex:1;overflow:auto;background:#0a1628;padding:30vh 30vw;display:flex;align-items:center;justify-content:center}
   svg.ymap{display:block;filter:drop-shadow(0 6px 30px rgba(0,0,0,.6));user-select:none}
 
   .building-outline{fill:#142a47;stroke:#e94560;stroke-width:2.5;stroke-linejoin:round}
@@ -737,6 +737,7 @@ function switchFloor(idx){
   saveAll();
   currentFloorIdx=idx;
   syncAliases();
+  setTimeout(centerView, 30);
   selectionSet.clear();
   selectedId=null; closeSidebar();
   drawingFlow=null; drawingPassage=null;
@@ -809,7 +810,13 @@ function setZoom(z, pivot){
 }
 function zoomIn(){setZoom(zoom*1.25);}
 function zoomOut(){setZoom(zoom/1.25);}
-function zoomReset(){setZoom(1);}
+function zoomReset(){setZoom(1); centerView();}
+function centerView(){
+  const wrap=document.querySelector('.map-wrap');
+  if(!wrap) return;
+  wrap.scrollLeft=(wrap.scrollWidth-wrap.clientWidth)/2;
+  wrap.scrollTop=(wrap.scrollHeight-wrap.clientHeight)/2;
+}
 
 // ─── PAN: пробел+drag или средняя кнопка мыши ───
 let panState=null;
@@ -2298,6 +2305,7 @@ buildSVG();
 bindEvents();
 updateStats();
 pushHistory(); // начальный снапшот
+setTimeout(centerView, 50);
 </script>
 
 </body>
