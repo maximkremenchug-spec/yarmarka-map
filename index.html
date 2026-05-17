@@ -878,12 +878,25 @@ function renderVertexHandles(svg){
 
 function renderEditSelectionOverlays(svg){
   if(!editSelectedId)return;
-  let obj=null, bbox=null;
+  if(editSelectedType==='flow'){
+    const f=flows.find(p=>p.id===editSelectedId);
+    if(!f)return;
+    f.points.forEach((p,i)=>{
+      svg.appendChild(el('circle',{
+        cx:p[0],cy:p[1],r:5.5,
+        fill:'#ffe600',stroke:'#000','stroke-width':1.5,
+        style:'cursor:move',
+        'data-id':editSelectedId,'data-idx':i,'data-kind':'flow-vertex',
+      }));
+    });
+    return;
+  }
+  let bbox=null;
   if(editSelectedType==='stall'){
-    obj=stalls[editSelectedId];
+    const obj=stalls[editSelectedId];
     if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};
   } else if(editSelectedType==='passage'){
-    obj=passages.find(p=>p.id===editSelectedId);
+    const obj=passages.find(p=>p.id===editSelectedId);
     if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};
   }
   if(!bbox)return;
@@ -963,14 +976,16 @@ function onSvgMouseDown(e){
       e.preventDefault();
       const id=tg.dataset.id;
       const f=flows.find(x=>x.id===id);
+      if(!f) return;
       editSelectedId=id; editSelectedType='flow';
+      dragState={type:'flow', id,
+        startX:p.x, startY:p.y,
+        origPoints:f.points.map(pt=>[pt[0],pt[1]]),
+        moved:false};
       buildSVG();
-      myPrompt(`Чел/час для потока «${id}»:`, f.count||0, {type:'number'}).then(newCount=>{
-        if(newCount===null) return;
-        const n=Math.max(0, parseInt(newCount,10)||0);
-        f.count=n;
-        saveAll(); pushHistory(); buildSVG(); updateStats();
-      });
+    } else if(kind==='flow-vertex'){
+      e.preventDefault();
+      dragState={type:'flow-vertex', id:tg.dataset.id, idx:+tg.dataset.idx, moved:false};
     } else {
       if(editSelectedId){editSelectedId=null; editSelectedType=null; buildSVG();}
     }
@@ -1061,6 +1076,21 @@ function onDocMouseMove(e){
       ps.y=Math.round(p.y-dragState.offsetY);
       if(!dragState.moved && (Math.abs(p.x-dragState.startX)>2||Math.abs(p.y-dragState.startY)>2)) dragState.moved=true;
       buildSVG();
+    } else if(dragState.type==='flow'){
+      const dx=p.x-dragState.startX, dy=p.y-dragState.startY;
+      const f=flows.find(x=>x.id===dragState.id);
+      if(f){
+        f.points=dragState.origPoints.map(pt=>[Math.round(pt[0]+dx), Math.round(pt[1]+dy)]);
+        if(!dragState.moved && (Math.abs(dx)>2||Math.abs(dy)>2)) dragState.moved=true;
+        buildSVG();
+      }
+    } else if(dragState.type==='flow-vertex'){
+      const f=flows.find(x=>x.id===dragState.id);
+      if(f){
+        f.points[dragState.idx]=[Math.round(p.x), Math.round(p.y)];
+        if(!dragState.moved) dragState.moved=true;
+        buildSVG();
+      }
     } else if(dragState.type==='resize'){
       if(editSelectedType==='stall'){
         const s=stalls[editSelectedId];
@@ -1162,13 +1192,27 @@ function onSvgDblClick(e){
   // закончить рисование потока на двойном клике
   if(currentTool==='flow' && drawingFlow){
     e.preventDefault();
-    // последний click уже добавил точку, продублированную dblclick — уберём
     if(drawingFlow.points.length>=2) drawingFlow.points.pop();
     finishFlow();
     return;
   }
   if(currentTool==='vertex' && e.target.dataset && e.target.dataset.kind==='vertex'){
     insertVertex(e);
+    return;
+  }
+  // двойной клик по потоку в pointer tool — редактировать чел/час
+  if(currentTool==='pointer' && e.target.dataset && e.target.dataset.kind==='flow'){
+    e.preventDefault();
+    const id=e.target.dataset.id;
+    const f=flows.find(x=>x.id===id);
+    if(!f) return;
+    // отменим drag, который запустился по mousedown первого клика
+    dragState=null;
+    myPrompt(`Чел/час для потока «${id}»:`, f.count||0, {type:'number'}).then(newCount=>{
+      if(newCount===null) return;
+      f.count=Math.max(0, parseInt(newCount,10)||0);
+      saveAll(); pushHistory(); buildSVG(); updateStats();
+    });
   }
 }
 
