@@ -851,19 +851,20 @@ function renderBuilding(svg, b){
 
 function renderStall(svg, id, s){
   const imp=s.importance||'';
-  const rect=el('rect',{
+  const rot=s.r||0;
+  const g = rot ? el('g',{transform:`rotate(${rot.toFixed(2)} ${s.x+s.w/2} ${s.y+s.h/2})`}) : svg;
+  g.appendChild(el('rect',{
     id:`stall-${id}`,
     class:'stall-rect'+(editMode && isSelected('stall',id) ? ' edit-selected':'')+(!editMode && selectedId===id ? ' form-selected':''),
     x:s.x,y:s.y,width:s.w,height:s.h,
     fill:IMP_COLORS[imp],stroke:IMP_STROKE[imp],
     'stroke-width':.6,rx:1.5,
     'data-id':id,'data-kind':'stall',
-  });
-  svg.appendChild(rect);
+  }));
   if(s.w>=18 && s.h>=14){
     const num=id.split('-').pop();
     const fs=Math.max(6,Math.min(9,Math.min(s.h*0.4,s.w*0.32)));
-    svg.appendChild(el('text',{
+    g.appendChild(el('text',{
       x:s.x+s.w/2,y:s.y+s.h/2+1,
       'text-anchor':'middle','dominant-baseline':'central',
       'font-size':fs.toFixed(1),
@@ -871,10 +872,13 @@ function renderStall(svg, id, s){
       'pointer-events':'none','font-family':'sans-serif',
     },num));
   }
+  if(rot) svg.appendChild(g);
 }
 
 function renderPassage(svg, p){
   const t=ZONE_TYPES[p.type||'main']||ZONE_TYPES.main;
+  const rot=p.r||0;
+  const g = rot ? el('g',{transform:`rotate(${rot.toFixed(2)} ${p.x+p.w/2} ${p.y+p.h/2})`}) : svg;
   const attrs={
     id:`psg-${p.id}`,
     class:'passage-rect'+(editMode && isSelected('passage',p.id) ? ' edit-selected':''),
@@ -883,17 +887,17 @@ function renderPassage(svg, p){
     'data-id':p.id,'data-kind':'passage',
   };
   if(t.dash) attrs['stroke-dasharray']=t.dash;
-  svg.appendChild(el('rect',attrs));
-  // Подпись: своя ИЛИ название типа (если есть место)
+  g.appendChild(el('rect',attrs));
   const showLabel = p.label || (p.w>=60 && p.h>=22);
   if(showLabel && p.w>=40){
     const txt = p.label || t.label;
-    svg.appendChild(el('text',{
+    g.appendChild(el('text',{
       class:'passage-label',
       x:p.x+p.w/2, y:p.y+p.h/2+3.5,
       fill: t.stroke,
     }, txt));
   }
+  if(rot) svg.appendChild(g);
 }
 
 function tangentAtMid(pts){
@@ -993,55 +997,87 @@ function renderVertexHandles(svg){
   }
 }
 
+function getGroupBBox(){
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const{type,id} of selectionItems()){
+    if(type==='stall'){const s=stalls[id]; if(!s)continue;
+      minX=Math.min(minX,s.x); minY=Math.min(minY,s.y);
+      maxX=Math.max(maxX,s.x+s.w); maxY=Math.max(maxY,s.y+s.h);
+    } else if(type==='passage'){const ps=passages.find(p=>p.id===id); if(!ps)continue;
+      minX=Math.min(minX,ps.x); minY=Math.min(minY,ps.y);
+      maxX=Math.max(maxX,ps.x+ps.w); maxY=Math.max(maxY,ps.y+ps.h);
+    } else if(type==='flow'){const f=flows.find(x=>x.id===id); if(!f)continue;
+      for(const p of f.points){
+        minX=Math.min(minX,p[0]); minY=Math.min(minY,p[1]);
+        maxX=Math.max(maxX,p[0]); maxY=Math.max(maxY,p[1]);
+      }
+    }
+  }
+  if(minX===Infinity)return null;
+  return {minX,minY,maxX,maxY,w:maxX-minX,h:maxY-minY,cx:(minX+maxX)/2,cy:(minY+maxY)/2};
+}
+
 function renderEditSelectionOverlays(svg){
-  // рамка вокруг группы — если выделено больше одного
-  if(selectionSet.size>1){
-    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-    for(const{type,id} of selectionItems()){
-      if(type==='stall'){const s=stalls[id]; if(!s)continue; minX=Math.min(minX,s.x); minY=Math.min(minY,s.y); maxX=Math.max(maxX,s.x+s.w); maxY=Math.max(maxY,s.y+s.h);}
-      else if(type==='passage'){const ps=passages.find(p=>p.id===id); if(!ps)continue; minX=Math.min(minX,ps.x); minY=Math.min(minY,ps.y); maxX=Math.max(maxX,ps.x+ps.w); maxY=Math.max(maxY,ps.y+ps.h);}
-      else if(type==='flow'){const f=flows.find(x=>x.id===id); if(!f)continue; for(const p of f.points){minX=Math.min(minX,p[0]); minY=Math.min(minY,p[1]); maxX=Math.max(maxX,p[0]); maxY=Math.max(maxY,p[1]);}}
-    }
-    if(minX<Infinity){
-      const pad=6;
-      svg.appendChild(el('rect',{
-        x:minX-pad, y:minY-pad,
-        width:maxX-minX+pad*2, height:maxY-minY+pad*2,
-        fill:'none', stroke:'#ffe600','stroke-width':1.2,
-        'stroke-dasharray':'5,3','pointer-events':'none',
-      }));
-      svg.appendChild(el('text',{
-        x:minX-pad+4, y:minY-pad-4,
-        'font-size':10, fill:'#ffe600','font-family':'sans-serif','font-weight':700,'pointer-events':'none',
-      }, `выделено: ${selectionSet.size}`));
-    }
-    return;
-  }
-  // одиночное выделение — вершины потока или ручка ресайза
-  const single=selectionSingle();
-  if(!single)return;
-  if(single.type==='flow'){
-    const f=flows.find(p=>p.id===single.id);
-    if(!f)return;
-    f.points.forEach((p,i)=>{
-      svg.appendChild(el('circle',{
-        cx:p[0],cy:p[1],r:5.5,
-        fill:'#ffe600',stroke:'#000','stroke-width':1.5,
-        style:'cursor:move',
-        'data-id':single.id,'data-idx':i,'data-kind':'flow-vertex',
-      }));
-    });
-    return;
-  }
-  let bbox=null;
-  if(single.type==='stall'){const obj=stalls[single.id]; if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};}
-  else if(single.type==='passage'){const obj=passages.find(p=>p.id===single.id); if(obj) bbox={x:obj.x,y:obj.y,w:obj.w,h:obj.h};}
-  if(!bbox)return;
+  if(selectionSet.size===0)return;
+  const bb=getGroupBBox();
+  if(!bb)return;
+  const pad=6;
+  // рамка
   svg.appendChild(el('rect',{
-    id:'resize-handle',class:'resize-handle',
-    x:bbox.x+bbox.w-5,y:bbox.y+bbox.h-5,width:10,height:10,rx:1,
-    'data-kind':'resize',
+    x:bb.minX-pad, y:bb.minY-pad,
+    width:bb.w+pad*2, height:bb.h+pad*2,
+    fill:'none', stroke:'#ffe600','stroke-width':1.2,
+    'stroke-dasharray':'5,3','pointer-events':'none',
   }));
+  if(selectionSet.size>1){
+    svg.appendChild(el('text',{
+      x:bb.minX-pad+4, y:bb.minY-pad-4,
+      'font-size':10, fill:'#ffe600','font-family':'sans-serif','font-weight':700,'pointer-events':'none',
+    }, `выделено: ${selectionSet.size}`));
+  }
+  // 4 угловые ручки ресайза
+  const corners=[
+    {role:'nw',x:bb.minX-pad,y:bb.minY-pad,cur:'nwse-resize'},
+    {role:'ne',x:bb.maxX+pad,y:bb.minY-pad,cur:'nesw-resize'},
+    {role:'sw',x:bb.minX-pad,y:bb.maxY+pad,cur:'nesw-resize'},
+    {role:'se',x:bb.maxX+pad,y:bb.maxY+pad,cur:'nwse-resize'},
+  ];
+  for(const c of corners){
+    svg.appendChild(el('rect',{
+      x:c.x-5,y:c.y-5,width:10,height:10,
+      fill:'#ffe600',stroke:'#000','stroke-width':1.2,
+      style:`cursor:${c.cur}`,
+      'data-kind':'group-resize','data-role':c.role,
+    }));
+  }
+  // ручка поворота — над центром
+  const rotY=bb.minY-pad-22;
+  svg.appendChild(el('line',{
+    x1:bb.cx, y1:bb.minY-pad, x2:bb.cx, y2:rotY+6,
+    stroke:'#ffe600','stroke-width':1.2,
+    'pointer-events':'none',
+  }));
+  svg.appendChild(el('circle',{
+    cx:bb.cx, cy:rotY, r:7,
+    fill:'#ffe600',stroke:'#000','stroke-width':1.5,
+    style:'cursor:grab',
+    'data-kind':'group-rotate',
+  }));
+  // вершины потока — для одиночно выбранного потока
+  const single=selectionSingle();
+  if(single && single.type==='flow'){
+    const f=flows.find(p=>p.id===single.id);
+    if(f){
+      f.points.forEach((p,i)=>{
+        svg.appendChild(el('circle',{
+          cx:p[0],cy:p[1],r:5,
+          fill:'#fff',stroke:'#000','stroke-width':1.5,
+          style:'cursor:move',
+          'data-id':single.id,'data-idx':i,'data-kind':'flow-vertex',
+        }));
+      });
+    }
+  }
 }
 
 function drawGateArrow(svg, x, y, arrow, txt){
@@ -1093,8 +1129,36 @@ function onSvgMouseDown(e){
   }
 
   if(currentTool==='pointer'){
-    if(kind==='resize'){e.preventDefault(); dragState={type:'resize'}; return;}
     if(kind==='flow-vertex'){e.preventDefault(); dragState={type:'flow-vertex', id:tg.dataset.id, idx:+tg.dataset.idx, moved:false}; return;}
+    if(kind==='group-resize'){
+      e.preventDefault();
+      const bb=getGroupBBox(); if(!bb)return;
+      const role=tg.dataset.role;
+      let anchor;
+      if(role==='nw') anchor={x:bb.maxX, y:bb.maxY};
+      else if(role==='ne') anchor={x:bb.minX, y:bb.maxY};
+      else if(role==='sw') anchor={x:bb.maxX, y:bb.minY};
+      else                  anchor={x:bb.minX, y:bb.minY};
+      const origs=selectionItems().map(({type,id})=>{
+        if(type==='stall'){const s=stalls[id]; return s?{type,id,x:s.x,y:s.y,w:s.w,h:s.h,r:s.r||0}:null;}
+        if(type==='passage'){const ps=passages.find(p=>p.id===id); return ps?{type,id,x:ps.x,y:ps.y,w:ps.w,h:ps.h,r:ps.r||0}:null;}
+        if(type==='flow'){const f=flows.find(x=>x.id===id); return f?{type,id,points:f.points.map(p=>[p[0],p[1]])}:null;}
+      }).filter(Boolean);
+      dragState={type:'group-resize', role, anchor, origs, origW:Math.max(1,bb.w), origH:Math.max(1,bb.h), moved:false};
+      return;
+    }
+    if(kind==='group-rotate'){
+      e.preventDefault();
+      const bb=getGroupBBox(); if(!bb)return;
+      const startAngle=Math.atan2(p.y-bb.cy, p.x-bb.cx);
+      const origs=selectionItems().map(({type,id})=>{
+        if(type==='stall'){const s=stalls[id]; return s?{type,id,x:s.x,y:s.y,w:s.w,h:s.h,r:s.r||0}:null;}
+        if(type==='passage'){const ps=passages.find(p=>p.id===id); return ps?{type,id,x:ps.x,y:ps.y,w:ps.w,h:ps.h,r:ps.r||0}:null;}
+        if(type==='flow'){const f=flows.find(x=>x.id===id); return f?{type,id,points:f.points.map(p=>[p[0],p[1]])}:null;}
+      }).filter(Boolean);
+      dragState={type:'group-rotate', center:{x:bb.cx,y:bb.cy}, startAngle, origs, moved:false};
+      return;
+    }
 
     if(kind==='stall' || kind==='passage' || kind==='flow'){
       e.preventDefault();
@@ -1195,6 +1259,67 @@ function onDocMouseMove(e){
 
   if(dragState){
     const p=svgPoint(e);
+    if(dragState.type==='group-resize'){
+      let sx=(p.x-dragState.anchor.x)/(dragState.role==='nw'||dragState.role==='sw'?-dragState.origW:dragState.origW);
+      let sy=(p.y-dragState.anchor.y)/(dragState.role==='nw'||dragState.role==='ne'?-dragState.origH:dragState.origH);
+      // защита от нулевого/слишком маленького масштаба
+      if(Math.abs(sx)<0.1) sx=sx<0?-0.1:0.1;
+      if(Math.abs(sy)<0.1) sy=sy<0?-0.1:0.1;
+      if(e.shiftKey){const s=Math.min(Math.abs(sx),Math.abs(sy)); sx=Math.sign(sx)*s; sy=Math.sign(sy)*s;}
+      for(const o of dragState.origs){
+        if(o.type==='stall'||o.type==='passage'){
+          const target=o.type==='stall'?stalls[o.id]:passages.find(p=>p.id===o.id);
+          if(!target)continue;
+          const nx=dragState.anchor.x+(o.x-dragState.anchor.x)*sx;
+          const ny=dragState.anchor.y+(o.y-dragState.anchor.y)*sy;
+          const nw=o.w*Math.abs(sx);
+          const nh=o.h*Math.abs(sy);
+          target.x=Math.round(sx<0?nx-nw:nx);
+          target.y=Math.round(sy<0?ny-nh:ny);
+          target.w=Math.max(4,Math.round(nw));
+          target.h=Math.max(4,Math.round(nh));
+        } else if(o.type==='flow'){
+          const f=flows.find(x=>x.id===o.id);
+          if(!f)continue;
+          f.points=o.points.map(pt=>[
+            Math.round(dragState.anchor.x+(pt[0]-dragState.anchor.x)*sx),
+            Math.round(dragState.anchor.y+(pt[1]-dragState.anchor.y)*sy)
+          ]);
+        }
+      }
+      dragState.moved=true;
+      buildSVG();
+      return;
+    }
+    if(dragState.type==='group-rotate'){
+      const cur=Math.atan2(p.y-dragState.center.y, p.x-dragState.center.x);
+      let delta=cur-dragState.startAngle;
+      if(e.shiftKey){const step=Math.PI/12; delta=Math.round(delta/step)*step;}
+      const cs=Math.cos(delta), sn=Math.sin(delta);
+      const cx0=dragState.center.x, cy0=dragState.center.y;
+      for(const o of dragState.origs){
+        if(o.type==='stall'||o.type==='passage'){
+          const target=o.type==='stall'?stalls[o.id]:passages.find(p=>p.id===o.id);
+          if(!target)continue;
+          const rcx=o.x+o.w/2, rcy=o.y+o.h/2;
+          const dx=rcx-cx0, dy=rcy-cy0;
+          const ncx=cx0+dx*cs-dy*sn, ncy=cy0+dx*sn+dy*cs;
+          target.r=((o.r||0)+delta*180/Math.PI);
+          target.x=Math.round(ncx-target.w/2);
+          target.y=Math.round(ncy-target.h/2);
+        } else if(o.type==='flow'){
+          const f=flows.find(x=>x.id===o.id);
+          if(!f)continue;
+          f.points=o.points.map(pt=>{
+            const dx=pt[0]-cx0, dy=pt[1]-cy0;
+            return [Math.round(cx0+dx*cs-dy*sn), Math.round(cy0+dx*sn+dy*cs)];
+          });
+        }
+      }
+      dragState.moved=true;
+      buildSVG();
+      return;
+    }
     if(dragState.type==='block'){
       const dx=p.x-dragState.startX, dy=p.y-dragState.startY;
       for(const orig of dragState.origs){
