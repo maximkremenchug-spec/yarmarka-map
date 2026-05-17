@@ -940,7 +940,7 @@ function renderFlow(svg, f){
     }));
     labelPathId=`flow-rev-${f.id}`;
   }
-  const labelText=(f.count||0)+' чел/ч';
+  const labelText=(f.count||0)+' чел/сут';
   // dy: на исходном пути -5 поднимает текст «над» линией в экранных координатах.
   // На реверсном пути «над» = +5 (т.к. перпендикуляр инвертируется).
   const textEl=el('text',{class:'flow-label','text-anchor':'middle',dy:reverseLabel?5:-5});
@@ -1331,7 +1331,7 @@ function onSvgDblClick(e){
     if(!f) return;
     // отменим drag, который запустился по mousedown первого клика
     dragState=null;
-    myPrompt(`Чел/час для потока «${id}»:`, f.count||0, {type:'number'}).then(newCount=>{
+    myPrompt(`Чел/сутки для потока «${id}»:`, f.count||0, {type:'number'}).then(newCount=>{
       if(newCount===null) return;
       f.count=Math.max(0, parseInt(newCount,10)||0);
       saveAll(); pushHistory(); buildSVG(); updateStats();
@@ -1344,7 +1344,7 @@ function finishFlow(){
   const pts=drawingFlow.points.slice();
   if(pts.length<2){drawingFlow=null; document.getElementById('flow-pending')?.remove(); buildSVG(); return;}
   document.getElementById('flow-pending')?.remove();
-  myPrompt('Количество человек в час на этом отрезке:', 500, {type:'number'}).then(cnt=>{
+  myPrompt('Количество человек в сутки на этом отрезке:', 500, {type:'number'}).then(cnt=>{
     if(cnt===null){drawingFlow=null; buildSVG(); return;}
     const count=Math.max(0, parseInt(cnt,10)||0);
     flows.push({id:'F'+Date.now(), points:pts, count, label:''});
@@ -1532,7 +1532,7 @@ function onStallEnter(e){
     const id=tg.dataset.id; const f=flows.find(x=>x.id===id);
     if(!f)return;
     document.getElementById('tt-id').textContent='ПОТОК '+id;
-    document.getElementById('tt-name').textContent=(f.count||0)+' чел/час';
+    document.getElementById('tt-name').textContent=(f.count||0)+' чел/сут';
     document.getElementById('tt-detail').textContent=f.points.length+' точек · '+floors[currentFloorIdx].name;
     document.getElementById('tt-imp').style.display='none';
     tt.style.display='block';
@@ -1590,7 +1590,7 @@ function exportXLSX(){
   XLSX.utils.book_append_sheet(wb, ws1, 'Прилавки');
 
   // ── Лист 2: Пешеходные потоки ──
-  const flowRows=[['Этаж','ID','Чел/час','Точек','Координаты (x;y | x;y | ...)']];
+  const flowRows=[['Этаж','ID','Чел/сутки','Точек','Координаты (x;y | x;y | ...)']];
   for(const fl of floors){
     for(const f of fl.flows){
       flowRows.push([fl.name, f.id, num(f.count), f.points.length, f.points.map(p=>p.join(';')).join(' | ')]);
