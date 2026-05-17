@@ -45,7 +45,7 @@
   .floor-add:hover{color:#fff;border-color:#fff}
 
   .main{flex:1;display:flex;overflow:hidden;position:relative}
-  .map-wrap{flex:1;overflow:auto;background:#0a1628;display:flex;align-items:flex-start;justify-content:center;padding:20px}
+  .map-wrap{flex:1;overflow:auto;background:#0a1628;padding:80vh 80vw;display:flex;align-items:center;justify-content:center}
   svg.ymap{display:block;filter:drop-shadow(0 6px 30px rgba(0,0,0,.6));user-select:none}
 
   .building-outline{fill:#142a47;stroke:#e94560;stroke-width:2.5;stroke-linejoin:round}
@@ -790,7 +790,7 @@ function el(tag,attrs,text){
 }
 // ─── ZOOM ───
 let zoom=1;
-const ZOOM_MIN=0.15, ZOOM_MAX=15;
+const ZOOM_MIN=0.1, ZOOM_MAX=30;
 function setZoom(z, pivot){
   z=Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
   if(Math.abs(z-zoom)<0.001) return;
@@ -2260,13 +2260,23 @@ function bindEvents(){
     setZoom(zoom*factor, {worldX, worldY, localX, localY});
   }, {passive:false});
 
-  // хоткеи зума
+  // хоткеи зума + стрелки для пан-перемещения
   document.addEventListener('keydown', e=>{
-    if(!(e.metaKey||e.ctrlKey)) return;
     if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-    if(e.key==='='||e.key==='+'){e.preventDefault(); zoomIn();}
-    else if(e.key==='-'){e.preventDefault(); zoomOut();}
-    else if(e.key==='0'){e.preventDefault(); zoomReset();}
+    if(e.metaKey||e.ctrlKey){
+      if(e.key==='='||e.key==='+'){e.preventDefault(); zoomIn(); return;}
+      if(e.key==='-'){e.preventDefault(); zoomOut(); return;}
+      if(e.key==='0'){e.preventDefault(); zoomReset(); return;}
+    }
+    // стрелки — пан карты (без модификатора)
+    if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
+      e.preventDefault();
+      const step=e.shiftKey?200:60;
+      if(e.key==='ArrowLeft') wrap.scrollLeft-=step;
+      else if(e.key==='ArrowRight') wrap.scrollLeft+=step;
+      else if(e.key==='ArrowUp') wrap.scrollTop-=step;
+      else if(e.key==='ArrowDown') wrap.scrollTop+=step;
+    }
   });
   svg.addEventListener('click',onStallClick);
   svg.addEventListener('mouseover',e=>{
