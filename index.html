@@ -172,11 +172,6 @@
   .zoom-ctrl button:hover{background:#1a3050;color:#fff}
   .zoom-ctrl .zoom-pct{min-width:46px;text-align:center;font-size:11px;color:#7a9ab5;font-family:monospace}
 
-  /* info badge */
-  .info-badge{position:fixed;bottom:16px;left:20px;background:rgba(17,31,51,.95);border:1px solid #2a5a8a;border-radius:8px;padding:8px 14px;font-size:11px;color:#8ab0cc;z-index:4000;display:none;line-height:1.5;max-width:380px}
-  body.editing .info-badge{display:block}
-  .info-badge b{color:#ffe600}
-  .info-badge kbd{background:#0a1628;border:1px solid #1e3a5f;border-radius:3px;padding:0 4px;font-family:monospace;font-size:10px;color:#fff}
 </style>
 </head>
 <body class="tool-pointer">
@@ -304,11 +299,6 @@
   <button onclick="zoomReset()" title="Сбросить масштаб (⌘0)">⊙</button>
 </div>
 
-<div class="info-badge">
-  <b>Инструмент:</b> <span id="cur-tool-name">Двигать</span><br>
-  <b>Поток:</b> клики добавляют точки, <kbd>Enter</kbd> или <kbd>2×клик</kbd> — закончить · <kbd>Esc</kbd> — отмена<br>
-  <kbd>ПКМ</kbd> — удалить · <kbd>Del</kbd>/<kbd>⌫</kbd> — удалить выделенный · <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd> — undo/redo
-</div>
 
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal-card">
@@ -1213,7 +1203,7 @@ function setTool(tool){
   currentTool=tool;
   document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
   document.body.className=document.body.className.split(/\s+/).filter(c=>!c.startsWith('tool-')).join(' ')+' tool-'+tool;
-  document.getElementById('cur-tool-name').textContent=TOOL_NAMES[tool];
+  const tn=document.getElementById('cur-tool-name'); if(tn) tn.textContent=TOOL_NAMES[tool];
   selectionSet.clear();
   if(drawingFlow && tool!=='flow'){drawingFlow=null;}
   if(drawingPassage && tool!=='passage'){drawingPassage=null;}
