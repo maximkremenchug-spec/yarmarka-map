@@ -159,6 +159,12 @@
   .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
   .modal-actions .btn-save{flex:0 0 90px;padding:8px 14px}
 
+  /* zoom controls */
+  .zoom-ctrl{position:fixed;bottom:16px;right:20px;display:flex;gap:4px;align-items:center;z-index:4000;background:rgba(17,31,51,.92);border:1px solid #1e3a5f;border-radius:8px;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+  .zoom-ctrl button{width:34px;height:34px;background:#0a1628;border:1px solid #1e3a5f;color:#8ab0cc;border-radius:6px;cursor:pointer;font-size:16px;font-weight:bold;display:flex;align-items:center;justify-content:center;padding:0}
+  .zoom-ctrl button:hover{background:#1a3050;color:#fff}
+  .zoom-ctrl .zoom-pct{min-width:46px;text-align:center;font-size:11px;color:#7a9ab5;font-family:monospace}
+
   /* info badge */
   .info-badge{position:fixed;bottom:16px;left:20px;background:rgba(17,31,51,.95);border:1px solid #2a5a8a;border-radius:8px;padding:8px 14px;font-size:11px;color:#8ab0cc;z-index:4000;display:none;line-height:1.5;max-width:380px}
   body.editing .info-badge{display:block}
@@ -278,6 +284,13 @@
   <div class="ep-footer">
     <button class="btn btn-danger" onclick="resetConfig()">⤺ Сброс настроек зданий этажа</button>
   </div>
+</div>
+
+<div class="zoom-ctrl">
+  <button onclick="zoomOut()" title="Уменьшить (⌘−)">−</button>
+  <span class="zoom-pct" id="zoom-pct">100%</span>
+  <button onclick="zoomIn()" title="Увеличить (⌘+)">+</button>
+  <button onclick="zoomReset()" title="Сбросить масштаб (⌘0)">⊙</button>
 </div>
 
 <div class="info-badge">
@@ -771,6 +784,29 @@ function el(tag,attrs,text){
   if(text!==undefined)e.textContent=text;
   return e;
 }
+// ─── ZOOM ───
+let zoom=1;
+const ZOOM_MIN=0.2, ZOOM_MAX=5;
+function setZoom(z, pivot){
+  z=Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+  if(Math.abs(z-zoom)<0.001) return;
+  const wrap=document.querySelector('.map-wrap');
+  const svg=document.getElementById('ymap');
+  zoom=z;
+  svg.setAttribute('width', 800*zoom);
+  svg.setAttribute('height', 950*zoom);
+  const lbl=document.getElementById('zoom-pct');
+  if(lbl) lbl.textContent=Math.round(zoom*100)+'%';
+  if(pivot){
+    // удерживаем под курсором ту же точку карты
+    wrap.scrollLeft = pivot.worldX*zoom - pivot.localX;
+    wrap.scrollTop  = pivot.worldY*zoom - pivot.localY;
+  }
+}
+function zoomIn(){setZoom(zoom*1.2);}
+function zoomOut(){setZoom(zoom/1.2);}
+function zoomReset(){setZoom(1);}
+
 function svgPoint(evt){
   const svg=document.getElementById('ymap');
   const pt=svg.createSVGPoint();
@@ -1286,8 +1322,8 @@ function onDocMouseMove(e){
           const nh=o.h*Math.abs(sy);
           target.x=Math.round(sx<0?nx-nw:nx);
           target.y=Math.round(sy<0?ny-nh:ny);
-          target.w=Math.max(4,Math.round(nw));
-          target.h=Math.max(4,Math.round(nh));
+          target.w=Math.max(1,Math.round(nw));
+          target.h=Math.max(1,Math.round(nh));
         } else if(o.type==='flow'){
           const f=flows.find(x=>x.id===o.id);
           if(!f)continue;
@@ -2167,6 +2203,28 @@ function bindEvents(){
   document.addEventListener('mouseup',onDocMouseUp);
   svg.addEventListener('contextmenu',onSvgContextMenu);
   svg.addEventListener('dblclick',onSvgDblClick);
+
+  // зум колесом с Ctrl/Cmd
+  const wrap=document.querySelector('.map-wrap');
+  wrap.addEventListener('wheel', e=>{
+    if(!(e.ctrlKey||e.metaKey)) return;
+    e.preventDefault();
+    const rect=wrap.getBoundingClientRect();
+    const localX=e.clientX-rect.left, localY=e.clientY-rect.top;
+    const worldX=(localX+wrap.scrollLeft)/zoom;
+    const worldY=(localY+wrap.scrollTop)/zoom;
+    const factor=e.deltaY<0?1.1:1/1.1;
+    setZoom(zoom*factor, {worldX, worldY, localX, localY});
+  }, {passive:false});
+
+  // хоткеи зума
+  document.addEventListener('keydown', e=>{
+    if(!(e.metaKey||e.ctrlKey)) return;
+    if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    if(e.key==='='||e.key==='+'){e.preventDefault(); zoomIn();}
+    else if(e.key==='-'){e.preventDefault(); zoomOut();}
+    else if(e.key==='0'){e.preventDefault(); zoomReset();}
+  });
   svg.addEventListener('click',onStallClick);
   svg.addEventListener('mouseover',e=>{
     const kind=e.target.dataset && e.target.dataset.kind;
