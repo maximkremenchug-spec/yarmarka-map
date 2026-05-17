@@ -85,9 +85,9 @@
   body.editing.tool-stall .stall-rect,body.editing.tool-passage .stall-rect,body.editing.tool-flow .stall-rect{pointer-events:none;opacity:.55}
   body.editing.tool-passage .passage-rect,body.editing.tool-flow .passage-rect{pointer-events:none;opacity:.55}
 
-  /* tool palette */
-  .tool-palette{position:fixed;top:140px;left:24px;background:#111f33;border:1px solid #2a5a8a;border-radius:10px;padding:6px;display:none;flex-direction:column;gap:4px;z-index:5000;box-shadow:0 8px 30px rgba(0,0,0,.7)}
-  body.editing .tool-palette{display:flex}
+  /* tool palette — флекс-колонка слева */
+  .tool-palette{width:0;overflow:hidden;background:#0e1f33;border-right:1px solid #1e3a5f;flex-shrink:0;transition:width .2s ease;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0}
+  body.editing .tool-palette{width:64px;padding:8px 6px}
   .tool-btn{width:48px;height:48px;border:1px solid #1e3a5f;background:#0a1628;color:#8ab0cc;border-radius:7px;cursor:pointer;font-size:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:all .12s}
   .tool-btn:hover{background:#1a3050;color:#fff}
   .tool-btn.active{background:#e94560;color:#fff;border-color:#e94560}
@@ -126,9 +126,9 @@
   .btn-reset{padding:10px 14px;background:#0a1628;color:#5a7a98;border:1px solid #1e3a5f;border-radius:6px;font-size:12px;cursor:pointer}
   .btn-reset:hover{color:#e74c3c;border-color:#e74c3c}
 
-  /* edit-panel */
-  .edit-panel{position:fixed;top:140px;right:20px;width:360px;max-height:calc(100vh - 160px);background:#111f33;border:1px solid #2a5a8a;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.7);display:none;flex-direction:column;z-index:5000;overflow:hidden}
-  .edit-panel.open{display:flex}
+  /* edit-panel — флекс-колонка справа */
+  .edit-panel{width:0;overflow:hidden;background:#111f33;border-left:1px solid #1e3a5f;display:flex;flex-direction:column;transition:width .2s ease;flex-shrink:0}
+  .edit-panel.open{width:360px}
   .ep-header{padding:12px 16px;border-bottom:1px solid #1e3a5f;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:#0e1f33}
   .ep-title{font-size:13px;font-weight:700;color:#e94560}
   .ep-body{flex:1;overflow-y:auto;padding:8px 12px}
@@ -215,17 +215,17 @@
 
 <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
 
-<div class="tool-palette" id="tool-palette">
-  <button class="tool-btn active" data-tool="pointer" onclick="setTool('pointer')" title="Двигать / выделять"><span>🖱</span><span class="lbl">Двигать</span></button>
-  <button class="tool-btn" data-tool="stall" onclick="setTool('stall')" title="Прилавок (клик)"><span>📦</span><span class="lbl">Прилавок</span></button>
-  <button class="tool-btn" data-tool="passage" onclick="setTool('passage')" title="Зона: drag-прямоугольник, спросит тип"><span>🟦</span><span class="lbl">Зона</span></button>
-  <button class="tool-btn" data-tool="flow" onclick="setTool('flow')" title="Пешеходный поток"><span>👥</span><span class="lbl">Поток</span></button>
-  <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий"><span>⬡</span><span class="lbl">Контур</span></button>
-  <div class="tool-divider"></div>
-  <button class="tool-btn" data-tool="delete" onclick="setTool('delete')" title="Удалить (или ПКМ)"><span>🗑</span><span class="lbl">Удалить</span></button>
-</div>
-
 <div class="main">
+  <div class="tool-palette" id="tool-palette">
+    <button class="tool-btn active" data-tool="pointer" onclick="setTool('pointer')" title="Двигать / выделять"><span>🖱</span><span class="lbl">Двигать</span></button>
+    <button class="tool-btn" data-tool="stall" onclick="setTool('stall')" title="Прилавок (клик)"><span>📦</span><span class="lbl">Прилавок</span></button>
+    <button class="tool-btn" data-tool="passage" onclick="setTool('passage')" title="Зона: drag-прямоугольник, спросит тип"><span>🟦</span><span class="lbl">Зона</span></button>
+    <button class="tool-btn" data-tool="flow" onclick="setTool('flow')" title="Пешеходный поток"><span>👥</span><span class="lbl">Поток</span></button>
+    <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий"><span>⬡</span><span class="lbl">Контур</span></button>
+    <div class="tool-divider"></div>
+    <button class="tool-btn" data-tool="delete" onclick="setTool('delete')" title="Удалить (или ПКМ)"><span>🗑</span><span class="lbl">Удалить</span></button>
+  </div>
+
   <div class="map-wrap">
     <div class="pan-area">
       <div class="svg-sizer" id="svg-sizer">
@@ -284,16 +284,16 @@
       <button class="btn-reset" onclick="resetStallData()">Очистить</button>
     </div>
   </div>
-</div>
 
-<div class="edit-panel" id="edit-panel">
-  <div class="ep-header">
-    <span class="ep-title">⚙ Здания и автогенератор сетки</span>
-    <button class="sb-close" onclick="toggleEdit()">×</button>
-  </div>
-  <div class="ep-body" id="ep-body"></div>
-  <div class="ep-footer">
-    <button class="btn btn-danger" onclick="resetConfig()">⤺ Сброс настроек зданий этажа</button>
+  <div class="edit-panel" id="edit-panel">
+    <div class="ep-header">
+      <span class="ep-title">⚙ Здания и автогенератор сетки</span>
+      <button class="sb-close" onclick="toggleEdit()">×</button>
+    </div>
+    <div class="ep-body" id="ep-body"></div>
+    <div class="ep-footer">
+      <button class="btn btn-danger" onclick="resetConfig()">⤺ Сброс настроек зданий этажа</button>
+    </div>
   </div>
 </div>
 
@@ -1749,12 +1749,14 @@ function openStall(id){
   document.querySelectorAll('.stall-rect.form-selected').forEach(r=>r.classList.remove('form-selected'));
   const ee=document.getElementById('stall-'+id); if(ee)ee.classList.add('form-selected');
   document.getElementById('sidebar').classList.add('open');
+  setTimeout(centerView, 230);
 }
 
 function closeSidebar(){
   document.getElementById('sidebar').classList.remove('open');
   document.querySelectorAll('.stall-rect.form-selected').forEach(r=>r.classList.remove('form-selected'));
   selectedId=null;
+  setTimeout(centerView, 230);
 }
 
 function setImp(imp){currentImp=currentImp===imp?'':imp;updateImpButtons()}
@@ -2052,6 +2054,8 @@ function toggleEdit(){
   if(editMode){renderEditPanel();setTool('pointer');}
   else{selectionSet.clear();drawingFlow=null;drawingPassage=null;}
   buildSVG();
+  // пересчитать центр после того как боковые панели открылись/закрылись (transition 200ms)
+  setTimeout(centerView, 230);
 }
 
 function renderEditPanel(){
