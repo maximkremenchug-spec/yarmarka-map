@@ -1934,11 +1934,7 @@ function updateStats(){
   document.getElementById('progress-fill').style.width=(total?filled/total*100:0)+'%';
 }
 
-function exportXLSX(){
-  if(typeof XLSX==='undefined'){
-    alert('Библиотека Excel не загрузилась (проверь интернет). Попробуй обновить страницу.');
-    return;
-  }
+function buildXLSXWorkbook(){
   const wb=XLSX.utils.book_new();
   const num=v=>{const n=Number(v); return isNaN(n)?0:n;};
 
@@ -2093,6 +2089,15 @@ function exportXLSX(){
   ws5['!cols']=[{wch:16},{wch:11},{wch:11},{wch:10},{wch:11},{wch:18},{wch:18}];
   XLSX.utils.book_append_sheet(wb, ws5, 'Этажи');
 
+  return wb;
+}
+
+function exportXLSX(){
+  if(typeof XLSX==='undefined'){
+    alert('Библиотека Excel не загрузилась (проверь интернет). Попробуй обновить страницу.');
+    return;
+  }
+  const wb=buildXLSXWorkbook();
   XLSX.writeFile(wb, `yarmarka-audit-${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
@@ -2108,6 +2113,48 @@ function toggleDropdown(btn){
 }
 function closeAllDropdowns(){
   document.querySelectorAll('.dropdown.open').forEach(d=>d.classList.remove('open'));
+}
+
+// ── API для Electron-меню (вызывается из main.js через executeJavaScript) ──
+function getSaveDataJSON(){
+  const data={app:'yarmarka-plan', version:1, savedAt:new Date().toISOString(), floors, currentFloorIdx};
+  return JSON.stringify(data, null, 2);
+}
+function openFromContent(jsonText, filename){
+  let data;
+  try{ data=JSON.parse(jsonText); }
+  catch(err){ alert('Не удалось прочитать файл: '+err.message); return; }
+  if(!data || !Array.isArray(data.floors) || data.floors.length===0){
+    alert('Файл повреждён или неверный формат.');
+    return;
+  }
+  if(!confirm(`Загрузить «${filename}»?\nТекущее содержимое плана будет заменено (⌘Z вернёт).`)) return;
+  floors.length=0;
+  data.floors.forEach(fl=>floors.push(fl));
+  currentFloorIdx=Math.max(0, Math.min(data.currentFloorIdx||0, floors.length-1));
+  for(const fl of floors){
+    if(!fl.stalls) fl.stalls={};
+    if(!fl.passages) fl.passages=[];
+    if(!fl.flows) fl.flows=[];
+    if(!fl.buildings || fl.buildings.length===0) fl.buildings=makeDefaultBuildings();
+  }
+  syncAliases();
+  saveAll();
+  currentFilename=filename;
+  localStorage.setItem(FILE_KEY, filename);
+  selectionSet.clear(); selectedId=null;
+  closeSidebar();
+  pushHistory();
+  renderFloorTabs();
+  if(editMode) renderEditPanel();
+  buildSVG();
+  updateStats();
+  setTimeout(centerView, 50);
+}
+function getXLSXBase64(){
+  if(typeof XLSX==='undefined') return null;
+  const wb=buildXLSXWorkbook();
+  return XLSX.write(wb, {bookType:'xlsx', type:'base64'});
 }
 
 // ── Сохранение / открытие .json файла ──
