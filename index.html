@@ -99,6 +99,16 @@
   .flow-line.edit-selected{filter:drop-shadow(0 0 5px #ffe600)}
   .flow-label{font-size:10px;font-weight:500;fill:var(--text-main);stroke:var(--bg-canvas);stroke-width:2.5;paint-order:stroke fill;pointer-events:none;letter-spacing:.3px}
 
+  /* CSS-классы для theme-aware SVG элементов (var() в атрибутах ненадёжен) */
+  .sv-bg-canvas{fill:var(--bg-canvas)}
+  .sv-bg-road{fill:var(--bg-road)}
+  .sv-bg-plot{fill:var(--bg-plot)}
+  .sv-stroke-dim{stroke:var(--border-dim)}
+  .sv-watermark{fill:var(--watermark)}
+  .sv-compass-bg{fill:var(--bg-road);stroke:var(--border-2)}
+  .sv-text-faint{fill:var(--text-faint)}
+  .sv-stall-empty{fill:var(--stall-empty);stroke:var(--stall-empty-stroke)}
+
   .vertex-handle{fill:#ffe600;stroke:#000;stroke-width:1.5;cursor:move;transition:r .1s}
   .vertex-handle:hover{fill:#fff;r:8}
   .resize-handle{fill:#ffe600;stroke:#000;stroke-width:1;cursor:nwse-resize}
@@ -370,8 +380,8 @@ const LEGACY_STALLS_V1='yarmarka-tenant-audit-v1';
 const LEGACY_PASSAGES='yarmarka-passages-v1';
 const LEGACY_CONFIG='yarmarka-config-v1';
 
-const IMP_COLORS={A:'#2ecc71',B:'#3498db',C:'#e67e22',D:'#e74c3c','':'var(--stall-empty)'};
-const IMP_STROKE={A:'#27ae60',B:'#2980b9',C:'#ca6f1e',D:'#c0392b','':'var(--stall-empty-stroke)'};
+const IMP_COLORS={A:'#2ecc71',B:'#3498db',C:'#e67e22',D:'#e74c3c'};
+const IMP_STROKE={A:'#27ae60',B:'#2980b9',C:'#ca6f1e',D:'#c0392b'};
 const IMP_LABELS={A:'A — трафик-генератор',B:'B — стабильный',C:'C — слабый',D:'D — проблемный'};
 const IMP_BG={A:'#0d2e1a',B:'#0d1e34',C:'#2e1c08',D:'#2e0d0d'};
 
@@ -919,18 +929,18 @@ function buildSVG(){
   svg.innerHTML='';
 
   // фон / периметр / плот
-  svg.appendChild(el('rect',{width:800,height:950,fill:'var(--bg-canvas)'}));
-  svg.appendChild(el('rect',{x:0,y:0,width:800,height:170,fill:'var(--bg-road)'}));
-  svg.appendChild(el('rect',{x:0,y:880,width:800,height:70,fill:'var(--bg-road)'}));
-  svg.appendChild(el('rect',{x:0,y:0,width:90,height:950,fill:'var(--bg-road)'}));
-  svg.appendChild(el('rect',{x:710,y:0,width:90,height:950,fill:'var(--bg-road)'}));
-  svg.appendChild(el('rect',{x:90,y:170,width:620,height:710,fill:'var(--bg-plot)'}));
+  svg.appendChild(el('rect',{width:800,height:950,class:'sv-bg-canvas'}));
+  svg.appendChild(el('rect',{x:0,y:0,width:800,height:170,class:'sv-bg-road'}));
+  svg.appendChild(el('rect',{x:0,y:880,width:800,height:70,class:'sv-bg-road'}));
+  svg.appendChild(el('rect',{x:0,y:0,width:90,height:950,class:'sv-bg-road'}));
+  svg.appendChild(el('rect',{x:710,y:0,width:90,height:950,class:'sv-bg-road'}));
+  svg.appendChild(el('rect',{x:90,y:170,width:620,height:710,class:'sv-bg-plot'}));
 
   // пунктирные границы плота
-  svg.appendChild(el('line',{x1:0,y1:135,x2:800,y2:135,stroke:'var(--border-dim)','stroke-width':1.5,'stroke-dasharray':'10,6'}));
-  svg.appendChild(el('line',{x1:725,y1:170,x2:725,y2:880,stroke:'var(--border-dim)','stroke-width':1.5,'stroke-dasharray':'10,6'}));
-  svg.appendChild(el('line',{x1:75,y1:170,x2:75,y2:880,stroke:'var(--border-dim)','stroke-width':1.5,'stroke-dasharray':'10,6'}));
-  svg.appendChild(el('line',{x1:0,y1:895,x2:800,y2:895,stroke:'var(--border-dim)','stroke-width':1.5,'stroke-dasharray':'10,6'}));
+  svg.appendChild(el('line',{x1:0,y1:135,x2:800,y2:135,class:'sv-stroke-dim','stroke-width':1.5,'stroke-dasharray':'10,6'}));
+  svg.appendChild(el('line',{x1:725,y1:170,x2:725,y2:880,class:'sv-stroke-dim','stroke-width':1.5,'stroke-dasharray':'10,6'}));
+  svg.appendChild(el('line',{x1:75,y1:170,x2:75,y2:880,class:'sv-stroke-dim','stroke-width':1.5,'stroke-dasharray':'10,6'}));
+  svg.appendChild(el('line',{x1:0,y1:895,x2:800,y2:895,class:'sv-stroke-dim','stroke-width':1.5,'stroke-dasharray':'10,6'}));
 
   // входы
   drawGateArrow(svg, 250, 165, '↓', 'вход');
@@ -938,7 +948,7 @@ function buildSVG(){
   drawGateArrow(svg, 300, 885, '↑', 'вход');
 
   // этаж-метка (для контекста)
-  svg.appendChild(el('text',{x:400,y:90,'text-anchor':'middle','font-size':16,'font-weight':800,fill:'var(--watermark)','font-family':'sans-serif','pointer-events':'none','letter-spacing':2},floors[currentFloorIdx].name.toUpperCase()));
+  svg.appendChild(el('text',{x:400,y:90,'text-anchor':'middle','font-size':16,'font-weight':800,class:'sv-watermark','font-family':'sans-serif','pointer-events':'none','letter-spacing':2},floors[currentFloorIdx].name.toUpperCase()));
 
   // здания
   for(const b of BUILDINGS) renderBuilding(svg,b);
@@ -989,14 +999,15 @@ function renderStall(svg, id, s){
   const imp=s.importance||'';
   const rot=s.r||0;
   const g = rot ? el('g',{transform:`rotate(${rot.toFixed(2)} ${s.x+s.w/2} ${s.y+s.h/2})`}) : svg;
-  g.appendChild(el('rect',{
+  const stallAttrs={
     id:`stall-${id}`,
-    class:'stall-rect'+(editMode && isSelected('stall',id) ? ' edit-selected':'')+(!editMode && selectedId===id ? ' form-selected':''),
+    class:'stall-rect'+(imp?'':' sv-stall-empty')+(editMode && isSelected('stall',id) ? ' edit-selected':'')+(!editMode && selectedId===id ? ' form-selected':''),
     x:s.x,y:s.y,width:s.w,height:s.h,
-    fill:IMP_COLORS[imp],stroke:IMP_STROKE[imp],
     'stroke-width':.6,rx:1.5,
     'data-id':id,'data-kind':'stall',
-  }));
+  };
+  if(imp){stallAttrs.fill=IMP_COLORS[imp]; stallAttrs.stroke=IMP_STROKE[imp];}
+  g.appendChild(el('rect',stallAttrs));
   if(s.w>=18 && s.h>=14){
     const num=id.split('-').pop();
     const fs=Math.max(6,Math.min(9,Math.min(s.h*0.4,s.w*0.32)));
@@ -1229,17 +1240,17 @@ function renderEditSelectionOverlays(svg){
 function drawGateArrow(svg, x, y, arrow, txt){
   const g=el('g',{});
   g.appendChild(el('text',{x,y,'text-anchor':'middle','font-size':16,fill:'#2ecc71','font-family':'sans-serif','font-weight':'bold','pointer-events':'none'},arrow));
-  g.appendChild(el('text',{x:x+(arrow==='←'?-14:14),y:y+4,'text-anchor':arrow==='←'?'end':'start','font-size':9,fill:'var(--text-faint)','font-family':'sans-serif','font-style':'italic','pointer-events':'none'},txt));
+  g.appendChild(el('text',{x:x+(arrow==='←'?-14:14),y:y+4,'text-anchor':arrow==='←'?'end':'start','font-size':9,class:'sv-text-faint','font-family':'sans-serif','font-style':'italic','pointer-events':'none'},txt));
   svg.appendChild(g);
 }
 
 function drawCompass(svg, x, y){
   const g=el('g',{'pointer-events':'none'});
-  g.appendChild(el('circle',{cx:x,cy:y,r:18,fill:'var(--bg-road)',stroke:'var(--border-2)','stroke-width':1}));
+  g.appendChild(el('circle',{cx:x,cy:y,r:18,class:'sv-compass-bg','stroke-width':1}));
   g.appendChild(el('text',{x,y:y-7,'text-anchor':'middle','font-size':9,fill:'#e94560','font-weight':'bold','font-family':'sans-serif'},'С'));
-  g.appendChild(el('text',{x,y:y+13,'text-anchor':'middle','font-size':8,fill:'var(--text-faint)','font-family':'sans-serif'},'Ю'));
-  g.appendChild(el('text',{x:x-12,y:y+3,'text-anchor':'middle','font-size':8,fill:'var(--text-faint)','font-family':'sans-serif'},'З'));
-  g.appendChild(el('text',{x:x+12,y:y+3,'text-anchor':'middle','font-size':8,fill:'var(--text-faint)','font-family':'sans-serif'},'В'));
+  g.appendChild(el('text',{x,y:y+13,'text-anchor':'middle','font-size':8,class:'sv-text-faint','font-family':'sans-serif'},'Ю'));
+  g.appendChild(el('text',{x:x-12,y:y+3,'text-anchor':'middle','font-size':8,class:'sv-text-faint','font-family':'sans-serif'},'З'));
+  g.appendChild(el('text',{x:x+12,y:y+3,'text-anchor':'middle','font-size':8,class:'sv-text-faint','font-family':'sans-serif'},'В'));
   g.appendChild(el('line',{x1:x,y1:y-3,x2:x,y2:y+5,stroke:'#e94560','stroke-width':1.5}));
   svg.appendChild(g);
 }
