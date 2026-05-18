@@ -59,6 +59,14 @@
   .btn:disabled{opacity:.3;cursor:not-allowed;pointer-events:none}
   .btn-icon{padding:5px 9px;font-size:14px;line-height:1}
 
+  /* dropdown */
+  .dropdown{position:relative;display:inline-block}
+  .dropdown-menu{position:absolute;top:calc(100% + 4px);left:0;min-width:220px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:4px;display:none;z-index:5000;box-shadow:0 6px 20px var(--shadow)}
+  .dropdown.open .dropdown-menu{display:block}
+  .dropdown-menu button{display:block;width:100%;text-align:left;background:transparent;border:none;color:var(--text-dim);padding:7px 12px;font-size:12px;cursor:pointer;border-radius:4px;white-space:nowrap}
+  .dropdown-menu button:hover{background:var(--hover-bg);color:var(--text-main)}
+  .dropdown-menu hr{border:none;border-top:1px solid var(--border);margin:4px 0}
+
   .progress-bar{height:2px;background:var(--border);flex-shrink:0}
   .progress-fill{height:100%;background:linear-gradient(90deg,#e94560,#3498db);transition:width .4s}
 
@@ -243,10 +251,16 @@
   <button class="btn btn-icon" id="btn-undo" onclick="undo()" title="Отменить (Cmd+Z)" disabled>↶</button>
   <button class="btn btn-icon" id="btn-redo" onclick="redo()" title="Повторить (Cmd+Shift+Z)" disabled>↷</button>
   <button class="btn btn-success" onclick="toggleEdit()" id="btn-edit">⚙ Режим редактирования</button>
-  <button class="btn" onclick="openFromFile()" title="Открыть план из файла .json">📂 Открыть</button>
-  <button class="btn" onclick="saveToFile(false)" title="Сохранить в файл (быстро, с прошлым именем)">💾 Сохранить</button>
-  <button class="btn" onclick="saveToFile(true)" title="Сохранить с новым именем">💾… как</button>
-  <button class="btn" onclick="exportXLSX()">⬇ Excel</button>
+  <div class="dropdown">
+    <button class="btn" onclick="toggleDropdown(this)">📁 Файл ▾</button>
+    <div class="dropdown-menu">
+      <button onclick="openFromFile()">📂 Открыть…</button>
+      <button onclick="saveToFile(false)">💾 Сохранить</button>
+      <button onclick="saveToFile(true)">💾 Сохранить как…</button>
+      <hr>
+      <button onclick="exportXLSX()">⬇ Excel-отчёт</button>
+    </div>
+  </div>
   <button class="btn btn-danger" onclick="clearAll()">✕ Очистить</button>
 </div>
 
@@ -2090,6 +2104,20 @@ function exportXLSX(){
   XLSX.utils.book_append_sheet(wb, ws5, 'Этажи');
 
   XLSX.writeFile(wb, `yarmarka-audit-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ── Дропдаун "Файл" ──
+function toggleDropdown(btn){
+  const dd=btn.closest('.dropdown');
+  const wasOpen=dd.classList.contains('open');
+  document.querySelectorAll('.dropdown.open').forEach(d=>d.classList.remove('open'));
+  if(!wasOpen){
+    dd.classList.add('open');
+    setTimeout(()=>document.addEventListener('click', closeAllDropdowns, {once:true}), 0);
+  }
+}
+function closeAllDropdowns(){
+  document.querySelectorAll('.dropdown.open').forEach(d=>d.classList.remove('open'));
 }
 
 // ── Сохранение / открытие .json файла ──
