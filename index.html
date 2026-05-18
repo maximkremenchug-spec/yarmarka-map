@@ -841,7 +841,8 @@ function applyTheme(theme){
   const btn=document.getElementById('btn-theme');
   if(btn) btn.textContent = theme==='light' ? '☀️' : '🌙';
   localStorage.setItem(THEME_KEY, theme);
-  if(typeof buildSVG==='function') buildSVG();
+  // тема меняется через CSS-переменные — перерендер не нужен (но если floors уже загружены, можно)
+  if(typeof floors!=='undefined' && floors.length>0 && typeof buildSVG==='function') buildSVG();
 }
 function toggleTheme(){
   const cur=document.documentElement.getAttribute('data-theme')||'dark';
