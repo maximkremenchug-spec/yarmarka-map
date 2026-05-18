@@ -243,6 +243,9 @@
   <button class="btn btn-icon" id="btn-undo" onclick="undo()" title="Отменить (Cmd+Z)" disabled>↶</button>
   <button class="btn btn-icon" id="btn-redo" onclick="redo()" title="Повторить (Cmd+Shift+Z)" disabled>↷</button>
   <button class="btn btn-success" onclick="toggleEdit()" id="btn-edit">⚙ Режим редактирования</button>
+  <button class="btn" onclick="openFromFile()" title="Открыть план из файла .json">📂 Открыть</button>
+  <button class="btn" onclick="saveToFile(false)" title="Сохранить в файл (быстро, с прошлым именем)">💾 Сохранить</button>
+  <button class="btn" onclick="saveToFile(true)" title="Сохранить с новым именем">💾… как</button>
   <button class="btn" onclick="exportXLSX()">⬇ Excel</button>
   <button class="btn btn-danger" onclick="clearAll()">✕ Очистить</button>
 </div>
@@ -2087,6 +2090,74 @@ function exportXLSX(){
   XLSX.utils.book_append_sheet(wb, ws5, 'Этажи');
 
   XLSX.writeFile(wb, `yarmarka-audit-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ── Сохранение / открытие .json файла ──
+const FILE_KEY='yarmarka-last-filename';
+let currentFilename=localStorage.getItem(FILE_KEY)||'';
+
+async function saveToFile(askName){
+  const today=new Date().toISOString().slice(0,10);
+  const def = currentFilename ? currentFilename.replace(/\.json$/i,'') : `план-${today}`;
+  let name=def;
+  if(askName || !currentFilename){
+    const v = await myPrompt('Имя файла:', def);
+    if(v===null) return;
+    name = v.trim() || def;
+  }
+  if(!/\.json$/i.test(name)) name += '.json';
+  const data={
+    app:'yarmarka-plan', version:1,
+    savedAt:new Date().toISOString(),
+    floors, currentFloorIdx,
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  const url=URL.createObjectURL(blob);
+  a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 500);
+  currentFilename=name;
+  localStorage.setItem(FILE_KEY,name);
+}
+
+function openFromFile(){
+  const input=document.createElement('input');
+  input.type='file'; input.accept='.json,application/json';
+  input.onchange=async e=>{
+    const f=e.target.files && e.target.files[0]; if(!f) return;
+    let data;
+    try{data=JSON.parse(await f.text());}
+    catch(err){alert('Не удалось прочитать файл: '+err.message); return;}
+    if(!data || !Array.isArray(data.floors) || data.floors.length===0){
+      alert('Файл повреждён или неверный формат (нет массива floors).');
+      return;
+    }
+    if(!confirm(`Загрузить «${f.name}»?\nТекущее содержимое плана будет заменено (Cmd+Z может вернуть).`)) return;
+    floors.length=0;
+    data.floors.forEach(fl=>floors.push(fl));
+    currentFloorIdx=Math.max(0, Math.min(data.currentFloorIdx||0, floors.length-1));
+    // нормализуем поля
+    for(const fl of floors){
+      if(!fl.stalls) fl.stalls={};
+      if(!fl.passages) fl.passages=[];
+      if(!fl.flows) fl.flows=[];
+      if(!fl.buildings || fl.buildings.length===0) fl.buildings=makeDefaultBuildings();
+    }
+    syncAliases();
+    saveAll();
+    currentFilename=f.name;
+    localStorage.setItem(FILE_KEY, f.name);
+    selectionSet.clear();
+    selectedId=null;
+    closeSidebar();
+    pushHistory();
+    renderFloorTabs();
+    if(editMode) renderEditPanel();
+    buildSVG();
+    updateStats();
+    setTimeout(centerView, 50);
+  };
+  input.click();
 }
 
 function clearAll(){
