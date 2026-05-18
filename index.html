@@ -251,16 +251,6 @@
   <button class="btn btn-icon" id="btn-undo" onclick="undo()" title="Отменить (Cmd+Z)" disabled>↶</button>
   <button class="btn btn-icon" id="btn-redo" onclick="redo()" title="Повторить (Cmd+Shift+Z)" disabled>↷</button>
   <button class="btn btn-success" onclick="toggleEdit()" id="btn-edit">⚙ Режим редактирования</button>
-  <div class="dropdown">
-    <button class="btn" onclick="toggleDropdown(this)">📁 Файл ▾</button>
-    <div class="dropdown-menu">
-      <button onclick="openFromFile()">📂 Открыть…</button>
-      <button onclick="saveToFile(false)">💾 Сохранить</button>
-      <button onclick="saveToFile(true)">💾 Сохранить как…</button>
-      <hr>
-      <button onclick="exportXLSX()">⬇ Excel-отчёт</button>
-    </div>
-  </div>
   <button class="btn btn-danger" onclick="clearAll()">✕ Очистить</button>
 </div>
 
@@ -2443,6 +2433,16 @@ function bindEvents(){
     const factor=e.deltaY<0?1.1:1/1.1;
     setZoom(zoom*factor, {worldX, worldY, localX, localY});
   }, {passive:false});
+
+  // хоткеи файла (для веб-версии; в Electron то же делает меню)
+  document.addEventListener('keydown', e=>{
+    if(!(e.metaKey||e.ctrlKey)) return;
+    if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    const k=(e.key||'').toLowerCase();
+    if(k==='o'||k==='щ'){e.preventDefault(); openFromFile();}
+    else if(k==='s'||k==='ы'){e.preventDefault(); saveToFile(e.shiftKey);}
+    else if(k==='e'||k==='у'){e.preventDefault(); exportXLSX();}
+  });
 
   // хоткеи зума + стрелки для пан-перемещения
   document.addEventListener('keydown', e=>{
