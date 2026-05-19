@@ -1448,6 +1448,7 @@ function onSvgMouseDown(e){
         buildSVG();
         return;
       }
+      const wasOnlySelected = isSelected(kind,id) && selectionSet.size===1;
       if(!isSelected(kind,id)) selectionReplace(kind,id);
       // блочный drag всех выделенных
       const origs=selectionItems().map(({type,id})=>{
@@ -1456,7 +1457,8 @@ function onSvgMouseDown(e){
         if(type==='flow'){const f=flows.find(x=>x.id===id); return f?{type,id,points:f.points.map(p=>[p[0],p[1]])}:null;}
       }).filter(Boolean);
       dragState={type:'block', startX:p.x, startY:p.y, origs, moved:false};
-      buildSVG();
+      // не пересобираем DOM, если selection не изменилось — иначе ломается dblclick
+      if(!wasOnlySelected) buildSVG();
       return;
     }
 
