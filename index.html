@@ -2115,6 +2115,71 @@ function closeAllDropdowns(){
   document.querySelectorAll('.dropdown.open').forEach(d=>d.classList.remove('open'));
 }
 
+// ── Копировать / Вставить / Дублировать выделенное ──
+let clipboard=[];
+
+function copySelection(){
+  if(selectionSet.size===0) return;
+  clipboard=[];
+  for(const{type,id} of selectionItems()){
+    if(type==='stall'){const s=stalls[id]; if(s) clipboard.push({type, data:JSON.parse(JSON.stringify(s))});}
+    else if(type==='passage'){const ps=passages.find(p=>p.id===id); if(ps) clipboard.push({type, data:JSON.parse(JSON.stringify(ps))});}
+    else if(type==='flow'){const f=flows.find(x=>x.id===id); if(f) clipboard.push({type, data:JSON.parse(JSON.stringify(f))});}
+  }
+  flashStatus(`Скопировано: ${clipboard.length}`);
+}
+
+function pasteClipboard(){
+  if(clipboard.length===0){flashStatus('Буфер пуст'); return;}
+  const dx=24, dy=24;
+  selectionSet.clear();
+  for(const item of clipboard){
+    if(item.type==='stall'){
+      const nd=JSON.parse(JSON.stringify(item.data));
+      nd.x+=dx; nd.y+=dy;
+      const bid=nd.building||'X';
+      const id=getNextStallId(bid);
+      stalls[id]=nd;
+      selectionAdd('stall', id);
+    } else if(item.type==='passage'){
+      const nd=JSON.parse(JSON.stringify(item.data));
+      nd.x+=dx; nd.y+=dy;
+      nd.id='P'+Date.now()+Math.floor(Math.random()*1000);
+      passages.push(nd);
+      selectionAdd('passage', nd.id);
+    } else if(item.type==='flow'){
+      const nd=JSON.parse(JSON.stringify(item.data));
+      nd.points=nd.points.map(p=>[p[0]+dx, p[1]+dy]);
+      nd.id='F'+Date.now()+Math.floor(Math.random()*1000);
+      flows.push(nd);
+      selectionAdd('flow', nd.id);
+    }
+  }
+  saveAll(); pushHistory();
+  buildSVG(); updateStats(); renderFloorTabs();
+  flashStatus(`Вставлено: ${clipboard.length}`);
+}
+
+function duplicateSelection(){
+  if(selectionSet.size===0){flashStatus('Ничего не выделено'); return;}
+  copySelection();
+  pasteClipboard();
+}
+
+function flashStatus(msg){
+  let t=document.getElementById('flash-status');
+  if(!t){
+    t=document.createElement('div');
+    t.id='flash-status';
+    t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--bg-panel);color:var(--text-main);border:1px solid var(--border-2);padding:6px 14px;border-radius:6px;font-size:12px;z-index:9999;pointer-events:none;transition:opacity .2s;box-shadow:0 2px 12px var(--shadow)';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.style.opacity='1';
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>{t.style.opacity='0';}, 1300);
+}
+
 // ── API для Electron-меню (вызывается из main.js через executeJavaScript) ──
 function getSaveDataJSON(){
   const data={app:'yarmarka-plan', version:1, savedAt:new Date().toISOString(), floors, currentFloorIdx};
@@ -2480,6 +2545,21 @@ function bindEvents(){
     const factor=e.deltaY<0?1.1:1/1.1;
     setZoom(zoom*factor, {worldX, worldY, localX, localY});
   }, {passive:false});
+
+  // хоткеи копирования/вставки/дублирования
+  document.addEventListener('keydown', e=>{
+    if(!(e.metaKey||e.ctrlKey)) return;
+    const ae=document.activeElement;
+    if(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
+    const k=(e.key||'').toLowerCase();
+    if(k==='c'||k==='с'){
+      if(selectionSet.size>0){e.preventDefault(); copySelection();}
+    } else if(k==='v'||k==='м'){
+      if(clipboard.length>0){e.preventDefault(); pasteClipboard();}
+    } else if(k==='d'||k==='в'){
+      if(selectionSet.size>0){e.preventDefault(); duplicateSelection();}
+    }
+  });
 
   // хоткеи файла (для веб-версии; в Electron то же делает меню)
   document.addEventListener('keydown', e=>{
