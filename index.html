@@ -365,7 +365,7 @@
     <div class="modal-msg">Направление нумерации</div>
     <select class="inp" id="renum-dir" style="margin-bottom:8px;cursor:pointer">
       <option value="bt-lr">Снизу вверх</option>
-      <option value="lr-tb">Слева направо</option>
+      <option value="tb-lr">Слева направо</option>
     </select>
     <div class="modal-actions">
       <button class="btn" id="renum-cancel">Отмена</button>
@@ -2568,7 +2568,7 @@ function pickRenumberDir(){
     const ok=document.getElementById('renum-ok');
     const cancel=document.getElementById('renum-cancel');
     sel.value=localStorage.getItem('renum-dir')||'bt-lr';
-    if(!['bt-lr','lr-tb'].includes(sel.value)) sel.value='bt-lr';
+    if(!['bt-lr','tb-lr'].includes(sel.value)) sel.value='bt-lr';
     ov.classList.add('show');
     const close=v=>{modalOpen=false; ov.classList.remove('show'); ok.onclick=null; cancel.onclick=null; resolve(v);};
     ok.onclick=()=>{localStorage.setItem('renum-dir',sel.value); close(sel.value);};
@@ -2608,7 +2608,7 @@ function sortByDirection(entries, dir){
 
 const RENUM_DIR_LABEL={
   'bt-lr':'снизу вверх',
-  'lr-tb':'слева направо',
+  'tb-lr':'слева направо',
 };
 
 async function renumberBuilding(bid){
