@@ -364,14 +364,8 @@
   <div class="modal-card">
     <div class="modal-msg">Направление нумерации</div>
     <select class="inp" id="renum-dir" style="margin-bottom:8px;cursor:pointer">
-      <option value="tb-lr">Сверху вниз, слева направо (по умолчанию)</option>
-      <option value="tb-rl">Сверху вниз, справа налево</option>
-      <option value="bt-lr">Снизу вверх, слева направо</option>
-      <option value="bt-rl">Снизу вверх, справа налево</option>
-      <option value="lr-tb">Слева направо, сверху вниз (колонками)</option>
-      <option value="lr-bt">Слева направо, снизу вверх</option>
-      <option value="rl-tb">Справа налево, сверху вниз</option>
-      <option value="rl-bt">Справа налево, снизу вверх</option>
+      <option value="bt-lr">Снизу вверх (колонками снизу-вверх, ряды слева-направо)</option>
+      <option value="lr-tb">Слева направо (рядами слева-направо, столбцы сверху-вниз)</option>
     </select>
     <div class="modal-actions">
       <button class="btn" id="renum-cancel">Отмена</button>
@@ -2573,7 +2567,8 @@ function pickRenumberDir(){
     const sel=document.getElementById('renum-dir');
     const ok=document.getElementById('renum-ok');
     const cancel=document.getElementById('renum-cancel');
-    sel.value=localStorage.getItem('renum-dir')||'tb-lr';
+    sel.value=localStorage.getItem('renum-dir')||'bt-lr';
+    if(!['bt-lr','lr-tb'].includes(sel.value)) sel.value='bt-lr';
     ov.classList.add('show');
     const close=v=>{modalOpen=false; ov.classList.remove('show'); ok.onclick=null; cancel.onclick=null; resolve(v);};
     ok.onclick=()=>{localStorage.setItem('renum-dir',sel.value); close(sel.value);};
@@ -2612,14 +2607,8 @@ function sortByDirection(entries, dir){
 }
 
 const RENUM_DIR_LABEL={
-  'tb-lr':'сверху-вниз, слева-направо',
-  'tb-rl':'сверху-вниз, справа-налево',
-  'bt-lr':'снизу-вверх, слева-направо',
-  'bt-rl':'снизу-вверх, справа-налево',
-  'lr-tb':'слева-направо, сверху-вниз',
-  'lr-bt':'слева-направо, снизу-вверх',
-  'rl-tb':'справа-налево, сверху-вниз',
-  'rl-bt':'справа-налево, снизу-вверх',
+  'bt-lr':'снизу вверх',
+  'lr-tb':'слева направо',
 };
 
 async function renumberBuilding(bid){
