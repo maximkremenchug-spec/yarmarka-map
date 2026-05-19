@@ -264,7 +264,8 @@
     <button class="tool-btn" data-tool="stall" onclick="setTool('stall')" title="Прилавок (клик)"><span>📦</span><span class="lbl">Прилавок</span></button>
     <button class="tool-btn" data-tool="passage" onclick="setTool('passage')" title="Зона: drag-прямоугольник, спросит тип"><span>🟦</span><span class="lbl">Зона</span></button>
     <button class="tool-btn" data-tool="flow" onclick="setTool('flow')" title="Пешеходный поток"><span>👥</span><span class="lbl">Поток</span></button>
-    <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий"><span>⬡</span><span class="lbl">Контур</span></button>
+    <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий и участка"><span>⬡</span><span class="lbl">Контур</span></button>
+    <button class="tool-btn" data-tool="site" onclick="setTool('site')" title="Контур участка — кликай вершины, Enter завершит"><span>🗺</span><span class="lbl">Участок</span></button>
     <button class="tool-btn" onclick="cycleLShape()" title="Сделать выделенные прилавки угловыми (L-формы) / цикл угла / убрать"><span>⌐</span><span class="lbl">Угловой</span></button>
     <div class="tool-divider"></div>
     <button class="tool-btn" data-tool="delete" onclick="setTool('delete')" title="Удалить (или ПКМ)"><span>🗑</span><span class="lbl">Удалить</span></button>
@@ -407,7 +408,7 @@ const IMP_STROKE={A:'#27ae60',B:'#2980b9',C:'#ca6f1e',D:'#c0392b'};
 const IMP_LABELS={A:'A — трафик-генератор',B:'B — стабильный',C:'C — слабый',D:'D — проблемный'};
 const IMP_BG={A:'#0d2e1a',B:'#0d1e34',C:'#2e1c08',D:'#2e0d0d'};
 
-const TOOL_NAMES={pointer:'Двигать',stall:'Прилавок',passage:'Зона',flow:'Поток',vertex:'Контур',delete:'Удалить'};
+const TOOL_NAMES={pointer:'Двигать',stall:'Прилавок',passage:'Зона',flow:'Поток',vertex:'Контур',site:'Участок',delete:'Удалить'};
 
 const ZONE_TYPES={
   main:    {label:'Главная аллея',     fill:'rgba(52,152,219,.18)', stroke:'#3498db', dash:''},
@@ -490,6 +491,7 @@ let currentTool='pointer';
 let dragState=null;
 let drawingPassage=null;
 let drawingFlow=null;        // {points:[[x,y],...]}
+let drawingSite=null;        // {points:[[x,y],...]} — рисование контура участка
 let vertexDragging=null;
 let modalOpen=false;
 
@@ -626,7 +628,7 @@ function makeDefaultBuildings(){
   return JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
 }
 function makeEmptyFloor(name){
-  return {name, stalls:{}, passages:[], buildings:makeDefaultBuildings(), flows:[]};
+  return {name, stalls:{}, passages:[], buildings:makeDefaultBuildings(), flows:[], site:null};
 }
 
 function loadAll(){
@@ -642,6 +644,7 @@ function loadAll(){
         if(!f.passages) f.passages=[];
         if(!f.flows) f.flows=[];
         if(!f.buildings || f.buildings.length===0) f.buildings=makeDefaultBuildings();
+        if(f.site===undefined) f.site=null;
       }
       syncAliases();
       return;
@@ -973,6 +976,9 @@ function buildSVG(){
   // этаж-метка (для контекста)
   svg.appendChild(el('text',{x:400,y:90,'text-anchor':'middle','font-size':16,'font-weight':800,class:'sv-watermark','font-family':'sans-serif','pointer-events':'none','letter-spacing':2},floors[currentFloorIdx].name.toUpperCase()));
 
+  // контур участка (под зданиями)
+  renderSite(svg);
+
   // здания
   for(const b of BUILDINGS) renderBuilding(svg,b);
 
@@ -1065,6 +1071,54 @@ function lEdges(s){
     {role:'notch-h',x1:x+cw,     y1:y+h-ch, x2:x,    y2:y+h-ch, o:'h'},
     {role:'left',   x1:x,        y1:y+h-ch, x2:x,    y2:y,    o:'v'},
   ];
+}
+
+function renderSite(svg){
+  const f=floors[currentFloorIdx];
+  const site=f.site;
+  // pending — пользователь рисует прямо сейчас
+  if(drawingSite){
+    const pts=drawingSite.points.slice();
+    if(pts.length>=1){
+      const d='M '+pts.map(p=>`${p[0]} ${p[1]}`).join(' L ')+(pts.length>=3?' Z':'');
+      svg.appendChild(el('path',{d, fill:'rgba(110,180,255,.06)', stroke:'#6eb4ff','stroke-width':1.6,'stroke-dasharray':'6,4','pointer-events':'none'}));
+      for(const p of pts){
+        svg.appendChild(el('circle',{cx:p[0],cy:p[1],r:3.5,fill:'#6eb4ff',stroke:'#000','stroke-width':1,'pointer-events':'none'}));
+      }
+    }
+    return;
+  }
+  if(!site || !site.path) return;
+  const pts=parsePath(site.path);
+  if(pts.length<2) return;
+  svg.appendChild(el('path',{
+    d:site.path,
+    fill:'rgba(80,140,200,.04)',
+    stroke:'#6a8eb0','stroke-width':1.6,
+    'stroke-dasharray':'8,5','pointer-events':'none',
+  }));
+  if(site.label){
+    const lx=(site.labelXY&&site.labelXY[0])||pts[0][0]+10;
+    const ly=(site.labelXY&&site.labelXY[1])||pts[0][1]+22;
+    svg.appendChild(el('text',{
+      x:lx, y:ly,
+      'font-size':18,'font-weight':700,fill:'#9ec3e8',
+      'font-family':'sans-serif',
+      'data-kind':'site-label',
+      style: editMode?'cursor:text':'cursor:default',
+    },site.label));
+  }
+  // ручки вершин в режиме «Контур»
+  if(editMode && currentTool==='vertex'){
+    pts.forEach((p,i)=>{
+      svg.appendChild(el('circle',{
+        cx:p[0],cy:p[1],r:4.5,
+        fill:'#6eb4ff',stroke:'#000','stroke-width':1.2,
+        style:'cursor:move',
+        'data-kind':'site-vertex','data-idx':i,
+      }));
+    });
+  }
 }
 
 function renderStall(svg, id, s){
@@ -1372,6 +1426,7 @@ function setTool(tool){
   selectionSet.clear();
   if(drawingFlow && tool!=='flow'){drawingFlow=null;}
   if(drawingPassage && tool!=='passage'){drawingPassage=null;}
+  if(drawingSite && tool!=='site'){drawingSite=null;}
   if(rubberBand){rubberBand=null; document.getElementById('rubber-band')?.remove();}
   if(document.activeElement && document.activeElement!==document.body) document.activeElement.blur();
   buildSVG();
@@ -1395,7 +1450,18 @@ function onSvgMouseDown(e){
     if(kind==='vertex'){
       e.preventDefault();
       vertexDragging={bid:tg.dataset.bid,idx:+tg.dataset.idx};
+    } else if(kind==='site-vertex'){
+      e.preventDefault();
+      vertexDragging={site:true,idx:+tg.dataset.idx};
     }
+    return;
+  }
+
+  if(currentTool==='site'){
+    e.preventDefault();
+    if(!drawingSite) drawingSite={points:[]};
+    drawingSite.points.push([Math.round(p.x),Math.round(p.y)]);
+    buildSVG();
     return;
   }
 
@@ -1527,6 +1593,15 @@ function onDocMouseMove(e){
   if(vertexDragging){
     const p=svgPoint(e);
     const x=Math.round(p.x),y=Math.round(p.y);
+    if(vertexDragging.site){
+      const site=floors[currentFloorIdx].site;
+      if(!site) return;
+      const pts=parsePath(site.path);
+      pts[vertexDragging.idx]=[x,y];
+      site.path=pointsToPath(pts);
+      buildSVG();
+      return;
+    }
     const b=BUILDINGS.find(x=>x.id===vertexDragging.bid);
     const pts=parsePath(b.path);
     pts[vertexDragging.idx]=[x,y];
@@ -1814,6 +1889,18 @@ function onSvgDblClick(e){
     insertVertex(e);
     return;
   }
+  // двойной клик по подписи участка — редактировать
+  if(e.target.dataset && e.target.dataset.kind==='site-label'){
+    e.preventDefault();
+    editSiteLabel();
+    return;
+  }
+  // завершить рисование участка
+  if(currentTool==='site' && drawingSite){
+    e.preventDefault();
+    finishSite();
+    return;
+  }
   // двойной клик по прилавку — переименовать вручную
   if(currentTool==='pointer' && e.target.dataset && e.target.dataset.kind==='stall'){
     e.preventDefault();
@@ -1855,6 +1942,40 @@ function onSvgDblClick(e){
       saveAll(); pushHistory(); buildSVG(); updateStats();
     });
   }
+}
+
+function finishSite(){
+  if(!drawingSite) return;
+  const pts=drawingSite.points.slice();
+  if(pts.length<3){drawingSite=null; buildSVG(); return;}
+  const path='M '+pts.map(p=>`${p[0]} ${p[1]}`).join(' L ')+' Z';
+  myPrompt('Подпись участка (можно оставить пустой):', floors[currentFloorIdx].site?.label || 'Участок').then(label=>{
+    if(label===null){drawingSite=null; buildSVG(); return;}
+    const f=floors[currentFloorIdx];
+    f.site={path, label:label.trim(), labelXY:[pts[0][0]+10, pts[0][1]+22]};
+    drawingSite=null;
+    saveAll(); pushHistory();
+    setTool('pointer');
+    buildSVG();
+  });
+}
+
+function editSiteLabel(){
+  const f=floors[currentFloorIdx];
+  if(!f.site) return;
+  myPrompt('Подпись участка:', f.site.label||'').then(v=>{
+    if(v===null) return;
+    f.site.label=v.trim();
+    saveAll(); pushHistory(); buildSVG();
+  });
+}
+
+function clearSite(){
+  const f=floors[currentFloorIdx];
+  if(!f.site) return;
+  if(!confirm('Удалить контур участка?')) return;
+  f.site=null;
+  saveAll(); pushHistory(); buildSVG();
 }
 
 function finishFlow(){
@@ -1918,10 +2039,12 @@ document.addEventListener('keydown',e=>{
     selectionSet.clear();
     if(drawingPassage){drawingPassage=null;document.getElementById('passage-ghost')?.remove();}
     if(drawingFlow){drawingFlow=null;document.getElementById('flow-pending')?.remove();}
+    if(drawingSite){drawingSite=null;}
     if(rubberBand){rubberBand=null;document.getElementById('rubber-band')?.remove();}
     buildSVG();
   } else if(e.key==='Enter'){
     if(drawingFlow){e.preventDefault();finishFlow();}
+    else if(drawingSite){e.preventDefault();finishSite();}
   } else if(e.key==='F2'){
     if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
     const single=selectionSingle();
