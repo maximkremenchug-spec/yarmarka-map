@@ -1812,6 +1812,13 @@ function onSvgDblClick(e){
     insertVertex(e);
     return;
   }
+  // двойной клик по прилавку — переименовать вручную
+  if(currentTool==='pointer' && e.target.dataset && e.target.dataset.kind==='stall'){
+    e.preventDefault();
+    dragState=null;
+    renameStallInEdit(e.target.dataset.id);
+    return;
+  }
   // двойной клик по зоне — редактировать тип/подпись
   if(currentTool==='pointer' && e.target.dataset && e.target.dataset.kind==='passage'){
     e.preventDefault();
@@ -1913,6 +1920,13 @@ document.addEventListener('keydown',e=>{
     buildSVG();
   } else if(e.key==='Enter'){
     if(drawingFlow){e.preventDefault();finishFlow();}
+  } else if(e.key==='F2'){
+    if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    const single=selectionSingle();
+    if(single && single.type==='stall'){
+      e.preventDefault();
+      renameStallInEdit(single.id);
+    }
   } else if((e.key==='Delete'||e.key==='Backspace') && selectionSet.size>0){
     if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
     for(const {type,id} of selectionItems()){
@@ -2568,6 +2582,22 @@ function regenerateGridFor(bid){
   generateGrid(bid, true);
   saveAll(); pushHistory();
   buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
+}
+
+function renameStallInEdit(oldId){
+  if(!oldId || !stalls[oldId]) return;
+  if(modalOpen) return;
+  myPrompt(`Новый номер прилавка (текущий: ${oldId}):`, oldId).then(v=>{
+    if(v===null) return;
+    const trimmed=String(v).trim();
+    if(!trimmed || trimmed===oldId) return;
+    if(stalls[trimmed]){alert(`ID "${trimmed}" уже используется.`); return;}
+    stalls[trimmed]=stalls[oldId];
+    delete stalls[oldId];
+    if(isSelected('stall',oldId)){selectionRemove('stall',oldId); selectionAdd('stall',trimmed);}
+    saveAll(); pushHistory();
+    buildSVG(); updateStats();
+  });
 }
 
 function toggleLabelOrient(bid){
