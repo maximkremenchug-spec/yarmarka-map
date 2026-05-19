@@ -2628,6 +2628,12 @@ async function renumberBuilding(bid){
 
   const sorted=sortByDirection(entries.map(([id,s])=>({id,s})), dir);
   const newIds=sorted.map((_,i)=>`${prefix.trim()||bid}-${String(start+i).padStart(pad,'0')}`);
+  // проверка: реально ли что-то меняется
+  const noChange = sorted.every((item,i)=>item.id===newIds[i]);
+  if(noChange){
+    alert(`Прилавки в ${bid} уже пронумерованы в порядке «${RENUM_DIR_LABEL[dir]||dir}». Ничего не меняю.`);
+    return;
+  }
   const otherIds=new Set(Object.keys(stalls).filter(id=>!entries.some(([eid])=>eid===id)));
   for(const nid of newIds){
     if(otherIds.has(nid)){alert(`Коллизия: ID "${nid}" уже используется.`);return;}
