@@ -1086,16 +1086,26 @@ function renderStall(svg, id, s){
     stallAttrs.x=s.x; stallAttrs.y=s.y; stallAttrs.width=s.w; stallAttrs.height=s.h; stallAttrs.rx=1.5;
     g.appendChild(el('rect',stallAttrs));
   }
-  if(s.w>=18 && s.h>=14){
+  // ориентация номера внутри клетки: 'h' (по умолчанию) или 'v' (снизу вверх — поворот -90°)
+  const b=BUILDINGS.find(x=>x.id===s.building);
+  const labelV=b && b.labelOrient==='v';
+  const fitsH=s.w>=18 && s.h>=14;
+  const fitsV=s.h>=18 && s.w>=14;
+  if((labelV?fitsV:fitsH)){
     const num=id.split('-').pop();
-    const fs=Math.max(6,Math.min(9,Math.min(s.h*0.4,s.w*0.32)));
-    g.appendChild(el('text',{
-      x:s.x+s.w/2,y:s.y+s.h/2+1,
+    const cx=s.x+s.w/2, cy=s.y+s.h/2+1;
+    const fs=labelV
+      ? Math.max(6,Math.min(9,Math.min(s.w*0.4,s.h*0.32)))
+      : Math.max(6,Math.min(9,Math.min(s.h*0.4,s.w*0.32)));
+    const tAttrs={
+      x:cx,y:cy,
       'text-anchor':'middle','dominant-baseline':'central',
       'font-size':fs.toFixed(1),
       fill:imp?'rgba(255,255,255,.78)':'rgba(100,160,220,.5)',
       'pointer-events':'none','font-family':'sans-serif',
-    },num));
+    };
+    if(labelV) tAttrs.transform=`rotate(-90 ${cx} ${cy})`;
+    g.appendChild(el('text',tAttrs,num));
   }
   if(rot) svg.appendChild(g);
 }
@@ -2508,6 +2518,7 @@ function renderEditPanel(){
         </div>
         <button class="btn btn-success" style="width:100%;margin-top:4px" onclick="regenerateGridFor('${b.id}')">🎲 Перегенерировать сетку (${b.rows}×${b.cols} = ${b.rows*b.cols} мест)</button>
         <button class="btn" style="width:100%;margin-top:4px" onclick="renumberBuilding('${b.id}')">🔢 Перенумеровать прилавки (выбрать направление)</button>
+        <button class="btn" style="width:100%;margin-top:4px" onclick="toggleLabelOrient('${b.id}')">${b.labelOrient==='v'?'↺ Номера: снизу вверх (вернуть горизонтально)':'↻ Повернуть номера снизу вверх'}</button>
         <div class="ep-section">Название</div>
         <input class="inp" type="text" value="${escapeHtml(b.label||'')}" data-bid="${b.id}" data-field="label" placeholder="напр. С6 — Новый корпус">
         <div class="ep-section">Контур (SVG path)</div>
@@ -2557,6 +2568,14 @@ function regenerateGridFor(bid){
   generateGrid(bid, true);
   saveAll(); pushHistory();
   buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
+}
+
+function toggleLabelOrient(bid){
+  const b=BUILDINGS.find(x=>x.id===bid);
+  if(!b) return;
+  b.labelOrient = (b.labelOrient==='v') ? 'h' : 'v';
+  saveAll(); pushHistory();
+  buildSVG(); renderEditPanel();
 }
 
 function pickRenumberDir(){
