@@ -265,6 +265,7 @@
     <button class="tool-btn" data-tool="passage" onclick="setTool('passage')" title="Зона: drag-прямоугольник, спросит тип"><span>🟦</span><span class="lbl">Зона</span></button>
     <button class="tool-btn" data-tool="flow" onclick="setTool('flow')" title="Пешеходный поток"><span>👥</span><span class="lbl">Поток</span></button>
     <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий"><span>⬡</span><span class="lbl">Контур</span></button>
+    <button class="tool-btn" onclick="cycleLShape()" title="Сделать выделенные прилавки угловыми (L-формы) / цикл угла / убрать"><span>⌐</span><span class="lbl">Угловой</span></button>
     <div class="tool-divider"></div>
     <button class="tool-btn" data-tool="delete" onclick="setTool('delete')" title="Удалить (или ПКМ)"><span>🗑</span><span class="lbl">Удалить</span></button>
   </div>
@@ -355,6 +356,26 @@
     <div class="modal-actions">
       <button class="btn" id="modal-cancel">Отмена</button>
       <button class="btn-save" id="modal-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="renum-modal">
+  <div class="modal-card">
+    <div class="modal-msg">Направление нумерации</div>
+    <select class="inp" id="renum-dir" style="margin-bottom:8px;cursor:pointer">
+      <option value="tb-lr">Сверху вниз, слева направо (по умолчанию)</option>
+      <option value="tb-rl">Сверху вниз, справа налево</option>
+      <option value="bt-lr">Снизу вверх, слева направо</option>
+      <option value="bt-rl">Снизу вверх, справа налево</option>
+      <option value="lr-tb">Слева направо, сверху вниз (колонками)</option>
+      <option value="lr-bt">Слева направо, снизу вверх</option>
+      <option value="rl-tb">Справа налево, сверху вниз</option>
+      <option value="rl-bt">Справа налево, снизу вверх</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn" id="renum-cancel">Отмена</button>
+      <button class="btn-save" id="renum-ok">OK</button>
     </div>
   </div>
 </div>
@@ -1003,19 +1024,74 @@ function renderBuilding(svg, b){
   }
 }
 
+function lPathD(s){
+  const x=s.x,y=s.y,w=s.w,h=s.h;
+  const cw=Math.min(Math.max(2,s.cut.cw|0), w-2);
+  const ch=Math.min(Math.max(2,s.cut.ch|0), h-2);
+  const c=s.cut.corner||'tr';
+  if(c==='tr') return `M${x},${y} L${x+w-cw},${y} L${x+w-cw},${y+ch} L${x+w},${y+ch} L${x+w},${y+h} L${x},${y+h} Z`;
+  if(c==='tl') return `M${x+cw},${y} L${x+w},${y} L${x+w},${y+h} L${x},${y+h} L${x},${y+ch} L${x+cw},${y+ch} Z`;
+  if(c==='br') return `M${x},${y} L${x+w},${y} L${x+w},${y+h-ch} L${x+w-cw},${y+h-ch} L${x+w-cw},${y+h} L${x},${y+h} Z`;
+  return `M${x},${y} L${x+w},${y} L${x+w},${y+h} L${x+cw},${y+h} L${x+cw},${y+h-ch} L${x},${y+h-ch} Z`;
+}
+function lEdges(s){
+  const x=s.x,y=s.y,w=s.w,h=s.h;
+  const cw=Math.min(Math.max(2,s.cut.cw|0), w-2);
+  const ch=Math.min(Math.max(2,s.cut.ch|0), h-2);
+  const c=s.cut.corner||'tr';
+  if(c==='tr') return [
+    {role:'top',    x1:x,        y1:y,    x2:x+w-cw, y2:y,    o:'h'},
+    {role:'notch-v',x1:x+w-cw,   y1:y,    x2:x+w-cw, y2:y+ch, o:'v'},
+    {role:'notch-h',x1:x+w-cw,   y1:y+ch, x2:x+w,    y2:y+ch, o:'h'},
+    {role:'right',  x1:x+w,      y1:y+ch, x2:x+w,    y2:y+h,  o:'v'},
+    {role:'bottom', x1:x+w,      y1:y+h,  x2:x,      y2:y+h,  o:'h'},
+    {role:'left',   x1:x,        y1:y+h,  x2:x,      y2:y,    o:'v'},
+  ];
+  if(c==='tl') return [
+    {role:'top',    x1:x+cw,     y1:y,    x2:x+w,    y2:y,    o:'h'},
+    {role:'right',  x1:x+w,      y1:y,    x2:x+w,    y2:y+h,  o:'v'},
+    {role:'bottom', x1:x+w,      y1:y+h,  x2:x,      y2:y+h,  o:'h'},
+    {role:'left',   x1:x,        y1:y+h,  x2:x,      y2:y+ch, o:'v'},
+    {role:'notch-h',x1:x,        y1:y+ch, x2:x+cw,   y2:y+ch, o:'h'},
+    {role:'notch-v',x1:x+cw,     y1:y+ch, x2:x+cw,   y2:y,    o:'v'},
+  ];
+  if(c==='br') return [
+    {role:'top',    x1:x,        y1:y,    x2:x+w,    y2:y,    o:'h'},
+    {role:'right',  x1:x+w,      y1:y,    x2:x+w,    y2:y+h-ch, o:'v'},
+    {role:'notch-h',x1:x+w,      y1:y+h-ch, x2:x+w-cw, y2:y+h-ch, o:'h'},
+    {role:'notch-v',x1:x+w-cw,   y1:y+h-ch, x2:x+w-cw, y2:y+h,    o:'v'},
+    {role:'bottom', x1:x+w-cw,   y1:y+h,  x2:x,      y2:y+h,  o:'h'},
+    {role:'left',   x1:x,        y1:y+h,  x2:x,      y2:y,    o:'v'},
+  ];
+  return [
+    {role:'top',    x1:x,        y1:y,    x2:x+w,    y2:y,    o:'h'},
+    {role:'right',  x1:x+w,      y1:y,    x2:x+w,    y2:y+h,  o:'v'},
+    {role:'bottom', x1:x+w,      y1:y+h,  x2:x+cw,   y2:y+h,  o:'h'},
+    {role:'notch-v',x1:x+cw,     y1:y+h,  x2:x+cw,   y2:y+h-ch, o:'v'},
+    {role:'notch-h',x1:x+cw,     y1:y+h-ch, x2:x,    y2:y+h-ch, o:'h'},
+    {role:'left',   x1:x,        y1:y+h-ch, x2:x,    y2:y,    o:'v'},
+  ];
+}
+
 function renderStall(svg, id, s){
   const imp=s.importance||'';
   const rot=s.r||0;
   const g = rot ? el('g',{transform:`rotate(${rot.toFixed(2)} ${s.x+s.w/2} ${s.y+s.h/2})`}) : svg;
+  const isL = s.shape==='L' && s.cut;
   const stallAttrs={
     id:`stall-${id}`,
     class:'stall-rect'+(imp?'':' sv-stall-empty')+(editMode && isSelected('stall',id) ? ' edit-selected':'')+(!editMode && selectedId===id ? ' form-selected':''),
-    x:s.x,y:s.y,width:s.w,height:s.h,
-    'stroke-width':.6,rx:1.5,
+    'stroke-width':.6,
     'data-id':id,'data-kind':'stall',
   };
   if(imp){stallAttrs.fill=IMP_COLORS[imp]; stallAttrs.stroke=IMP_STROKE[imp];}
-  g.appendChild(el('rect',stallAttrs));
+  if(isL){
+    stallAttrs.d=lPathD(s);
+    g.appendChild(el('path',stallAttrs));
+  } else {
+    stallAttrs.x=s.x; stallAttrs.y=s.y; stallAttrs.width=s.w; stallAttrs.height=s.h; stallAttrs.rx=1.5;
+    g.appendChild(el('rect',stallAttrs));
+  }
   if(s.w>=18 && s.h>=14){
     const num=id.split('-').pop();
     const fs=Math.max(6,Math.min(9,Math.min(s.h*0.4,s.w*0.32)));
@@ -1228,6 +1304,26 @@ function renderEditSelectionOverlays(svg){
     style:'cursor:grab',
     'data-kind':'group-rotate',
   }));
+  // 6 ручек по сторонам для L-углового прилавка
+  const singleForL=selectionSingle();
+  if(singleForL && singleForL.type==='stall'){
+    const s=stalls[singleForL.id];
+    if(s && s.shape==='L' && s.cut){
+      const rot=s.r||0;
+      const cx=s.x+s.w/2, cy=s.y+s.h/2;
+      const cs=Math.cos(rot*Math.PI/180), sn=Math.sin(rot*Math.PI/180);
+      for(const ed of lEdges(s)){
+        let mx=(ed.x1+ed.x2)/2, my=(ed.y1+ed.y2)/2;
+        if(rot){const dx=mx-cx, dy=my-cy; mx=cx+dx*cs-dy*sn; my=cy+dx*sn+dy*cs;}
+        svg.appendChild(el('rect',{
+          x:mx-4, y:my-4, width:8, height:8,
+          fill:'#ffe600', stroke:'#000', 'stroke-width':1.2,
+          style:`cursor:${ed.o==='h'?'ns-resize':'ew-resize'}`,
+          'data-kind':'l-side','data-role':ed.role,'data-id':singleForL.id,
+        }));
+      }
+    }
+  }
   // вершины потока — для одиночно выбранного потока
   const single=selectionSingle();
   if(single && single.type==='flow'){
@@ -1301,6 +1397,14 @@ function onSvgMouseDown(e){
 
   if(currentTool==='pointer'){
     if(kind==='flow-vertex'){e.preventDefault(); dragState={type:'flow-vertex', id:tg.dataset.id, idx:+tg.dataset.idx, moved:false}; return;}
+    if(kind==='l-side'){
+      e.preventDefault();
+      const id=tg.dataset.id; const role=tg.dataset.role;
+      const s=stalls[id]; if(!s) return;
+      const orig={x:s.x,y:s.y,w:s.w,h:s.h, cw:s.cut.cw, ch:s.cut.ch, corner:s.cut.corner};
+      dragState={type:'l-side', id, role, orig, startX:p.x, startY:p.y, moved:false};
+      return;
+    }
     if(kind==='group-resize'){
       e.preventDefault();
       const bb=getGroupBBox(); if(!bb)return;
@@ -1311,7 +1415,7 @@ function onSvgMouseDown(e){
       else if(role==='sw') anchor={x:bb.maxX, y:bb.minY};
       else                  anchor={x:bb.minX, y:bb.minY};
       const origs=selectionItems().map(({type,id})=>{
-        if(type==='stall'){const s=stalls[id]; return s?{type,id,x:s.x,y:s.y,w:s.w,h:s.h,r:s.r||0}:null;}
+        if(type==='stall'){const s=stalls[id]; return s?{type,id,x:s.x,y:s.y,w:s.w,h:s.h,r:s.r||0, cw:s.cut?.cw, ch:s.cut?.ch}:null;}
         if(type==='passage'){const ps=passages.find(p=>p.id===id); return ps?{type,id,x:ps.x,y:ps.y,w:ps.w,h:ps.h,r:ps.r||0}:null;}
         if(type==='flow'){const f=flows.find(x=>x.id===id); return f?{type,id,points:f.points.map(p=>[p[0],p[1]])}:null;}
       }).filter(Boolean);
@@ -1451,6 +1555,11 @@ function onDocMouseMove(e){
           target.y=Math.min(y1,y2);
           target.w=Math.max(1,Math.abs(x2-x1));
           target.h=Math.max(1,Math.abs(y2-y1));
+          // L-стол: масштабируем вырез пропорционально
+          if(o.type==='stall' && target.shape==='L' && target.cut && o.cw && o.ch && o.w && o.h){
+            target.cut.cw=Math.max(2, Math.min(target.w-2, Math.round(o.cw*target.w/o.w)));
+            target.cut.ch=Math.max(2, Math.min(target.h-2, Math.round(o.ch*target.h/o.h)));
+          }
         } else if(o.type==='flow'){
           const f=flows.find(x=>x.id===o.id);
           if(!f)continue;
@@ -1511,6 +1620,38 @@ function onDocMouseMove(e){
         if(!dragState.moved) dragState.moved=true;
         buildSVG();
       }
+      return;
+    }
+    if(dragState.type==='l-side'){
+      const s=stalls[dragState.id]; if(!s){return;}
+      const o=dragState.orig, role=dragState.role, c=o.corner;
+      let nx=o.x, ny=o.y, nw=o.w, nh=o.h, ncw=o.cw, nch=o.ch;
+      if(role==='top'){
+        const ny2=Math.round(Math.min(p.y, o.y+o.h-8));
+        nh=o.y+o.h-ny2; ny=ny2;
+      } else if(role==='bottom'){
+        nh=Math.max(8, Math.round(p.y-o.y));
+      } else if(role==='left'){
+        const nx2=Math.round(Math.min(p.x, o.x+o.w-8));
+        nw=o.x+o.w-nx2; nx=nx2;
+      } else if(role==='right'){
+        nw=Math.max(8, Math.round(p.x-o.x));
+      } else if(role==='notch-v'){
+        // вертикальная стенка выреза — двигаем X, меняем cw
+        if(c==='tr'||c==='br') ncw=Math.round(o.x+o.w-p.x);
+        else ncw=Math.round(p.x-o.x);
+      } else if(role==='notch-h'){
+        // горизонтальная стенка выреза — двигаем Y, меняем ch
+        if(c==='tr'||c==='tl') nch=Math.round(p.y-o.y);
+        else nch=Math.round(o.y+o.h-p.y);
+      }
+      // клампы
+      ncw=Math.max(2, Math.min(ncw, nw-2));
+      nch=Math.max(2, Math.min(nch, nh-2));
+      s.x=nx; s.y=ny; s.w=nw; s.h=nh;
+      s.cut.cw=ncw; s.cut.ch=nch;
+      if(!dragState.moved) dragState.moved=true;
+      buildSVG();
       return;
     }
     if(dragState.type==='resize'){
@@ -2118,6 +2259,32 @@ function closeAllDropdowns(){
 // ── Копировать / Вставить / Дублировать выделенное ──
 let clipboard=[];
 
+// Цикл по типу формы выделенных прилавков:
+//   rect → L(tr) → L(br) → L(bl) → L(tl) → rect
+const L_CYCLE=['tr','br','bl','tl'];
+function cycleLShape(){
+  if(selectionSet.size===0){ flashStatus('Сначала выдели прилавок'); return; }
+  let changed=0;
+  for(const{type,id} of selectionItems()){
+    if(type!=='stall') continue;
+    const s=stalls[id]; if(!s) continue;
+    if(s.shape!=='L' || !s.cut){
+      s.shape='L';
+      s.cut={cw:Math.max(4,Math.round(s.w/3)), ch:Math.max(4,Math.round(s.h/3)), corner:'tr'};
+    } else {
+      const idx=L_CYCLE.indexOf(s.cut.corner||'tr');
+      if(idx>=L_CYCLE.length-1){
+        // конец цикла — снимаем L
+        delete s.shape; delete s.cut;
+      } else {
+        s.cut.corner=L_CYCLE[idx+1];
+      }
+    }
+    changed++;
+  }
+  if(changed){ saveAll(); pushHistory(); buildSVG(); flashStatus(`Изменено: ${changed}`); }
+}
+
 function copySelection(){
   if(selectionSet.size===0) return;
   clipboard=[];
@@ -2346,7 +2513,7 @@ function renderEditPanel(){
           <div class="ep-col"><label>Контур (px²)</label><input type="text" value="${Math.round(polygonAreaPx(parsePath(b.path)))}" readonly style="opacity:.6"></div>
         </div>
         <button class="btn btn-success" style="width:100%;margin-top:4px" onclick="regenerateGridFor('${b.id}')">🎲 Перегенерировать сетку (${b.rows}×${b.cols} = ${b.rows*b.cols} мест)</button>
-        <button class="btn" style="width:100%;margin-top:4px" onclick="renumberBuilding('${b.id}')">🔢 Перенумеровать прилавки (сверху-вниз, слева-направо)</button>
+        <button class="btn" style="width:100%;margin-top:4px" onclick="renumberBuilding('${b.id}')">🔢 Перенумеровать прилавки (выбрать направление)</button>
         <div class="ep-section">Название</div>
         <input class="inp" type="text" value="${escapeHtml(b.label||'')}" data-bid="${b.id}" data-field="label" placeholder="напр. С6 — Новый корпус">
         <div class="ep-section">Контур (SVG path)</div>
@@ -2398,9 +2565,68 @@ function regenerateGridFor(bid){
   buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
 }
 
+function pickRenumberDir(){
+  return new Promise(resolve=>{
+    if(modalOpen){resolve(null);return;}
+    modalOpen=true;
+    const ov=document.getElementById('renum-modal');
+    const sel=document.getElementById('renum-dir');
+    const ok=document.getElementById('renum-ok');
+    const cancel=document.getElementById('renum-cancel');
+    sel.value=localStorage.getItem('renum-dir')||'tb-lr';
+    ov.classList.add('show');
+    const close=v=>{modalOpen=false; ov.classList.remove('show'); ok.onclick=null; cancel.onclick=null; resolve(v);};
+    ok.onclick=()=>{localStorage.setItem('renum-dir',sel.value); close(sel.value);};
+    cancel.onclick=()=>close(null);
+  });
+}
+
+function sortByDirection(entries, dir){
+  // entries: [{id,s}] — вычисляем bbox-центр прилавка
+  const items=entries.map(e=>({...e, cx:e.s.x+e.s.w/2, cy:e.s.y+e.s.h/2}));
+  // снеппинг по строкам/колонкам: толерантность ~15px
+  const TOL=15;
+  const primaryRow = (a,b)=>{
+    if(Math.abs(a.cy-b.cy)<=TOL) return 0;
+    return a.cy-b.cy;
+  };
+  const primaryCol = (a,b)=>{
+    if(Math.abs(a.cx-b.cx)<=TOL) return 0;
+    return a.cx-b.cx;
+  };
+  const cmpY=(s)=>(a,b)=>s*(a.cy-b.cy);
+  const cmpX=(s)=>(a,b)=>s*(a.cx-b.cx);
+  // dir: <primary axis>-<secondary axis>
+  // tb/bt — primary по Y (строки), затем по X
+  // lr/rl — primary по X (колонки), затем по Y
+  let cmp;
+  if(dir==='tb-lr') cmp=(a,b)=>primaryRow(a,b)||(a.cx-b.cx);
+  else if(dir==='tb-rl') cmp=(a,b)=>primaryRow(a,b)||(b.cx-a.cx);
+  else if(dir==='bt-lr') cmp=(a,b)=>(-primaryRow(a,b))||(a.cx-b.cx);
+  else if(dir==='bt-rl') cmp=(a,b)=>(-primaryRow(a,b))||(b.cx-a.cx);
+  else if(dir==='lr-tb') cmp=(a,b)=>primaryCol(a,b)||(a.cy-b.cy);
+  else if(dir==='lr-bt') cmp=(a,b)=>primaryCol(a,b)||(b.cy-a.cy);
+  else if(dir==='rl-tb') cmp=(a,b)=>(-primaryCol(a,b))||(a.cy-b.cy);
+  else /*rl-bt*/        cmp=(a,b)=>(-primaryCol(a,b))||(b.cy-a.cy);
+  return items.sort(cmp);
+}
+
+const RENUM_DIR_LABEL={
+  'tb-lr':'сверху-вниз, слева-направо',
+  'tb-rl':'сверху-вниз, справа-налево',
+  'bt-lr':'снизу-вверх, слева-направо',
+  'bt-rl':'снизу-вверх, справа-налево',
+  'lr-tb':'слева-направо, сверху-вниз',
+  'lr-bt':'слева-направо, снизу-вверх',
+  'rl-tb':'справа-налево, сверху-вниз',
+  'rl-bt':'справа-налево, снизу-вверх',
+};
+
 async function renumberBuilding(bid){
   const entries=Object.entries(stalls).filter(([_,s])=>s.building===bid);
   if(entries.length===0){alert(`В ${bid} нет прилавков на ${floors[currentFloorIdx].name}.`);return;}
+  const dir=await pickRenumberDir();
+  if(dir===null) return;
   const prefix=await myPrompt(`Префикс для нумерации в ${bid}:`, bid);
   if(prefix===null) return;
   const startStr=await myPrompt('Начать с номера:', '1', {type:'number'});
@@ -2411,10 +2637,7 @@ async function renumberBuilding(bid){
   if(padStr===null) return;
   const pad=Math.max(1, parseInt(padStr,10)||3);
 
-  const sorted=entries.map(([id,s])=>({id,s})).sort((a,b)=>{
-    if(Math.abs(a.s.y-b.s.y)<=15) return a.s.x-b.s.x;
-    return a.s.y-b.s.y;
-  });
+  const sorted=sortByDirection(entries.map(([id,s])=>({id,s})), dir);
   const newIds=sorted.map((_,i)=>`${prefix.trim()||bid}-${String(start+i).padStart(pad,'0')}`);
   const otherIds=new Set(Object.keys(stalls).filter(id=>!entries.some(([eid])=>eid===id)));
   for(const nid of newIds){
@@ -2424,7 +2647,7 @@ async function renumberBuilding(bid){
   sorted.forEach((item,i)=>{stalls[newIds[i]]={...item.s,building:bid};});
   saveAll(); pushHistory();
   buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
-  alert(`Перенумеровано ${entries.length} прилавков: ${newIds[0]} … ${newIds[newIds.length-1]}`);
+  alert(`Перенумеровано ${entries.length} прилавков (${RENUM_DIR_LABEL[dir]||dir}): ${newIds[0]} … ${newIds[newIds.length-1]}`);
 }
 
 function getNextBuildingId(){
