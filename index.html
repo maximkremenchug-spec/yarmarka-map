@@ -2743,7 +2743,7 @@ function onConfigChange(e){
 function regenerateGridFor(bid){
   const b=BUILDINGS.find(x=>x.id===bid);
   const cnt=Object.values(stalls).filter(s=>s.building===bid).length;
-  if(cnt>0 && !confirm(`Заменить ${cnt} прилавков в ${bid} на новую сетку ${b.rows}×${b.cols} (на ${floors[currentFloorIdx].name})? Данные арендаторов будут потеряны.`)) return;
+  if(cnt>0 && !confirm(`⚠️ Удалить ВСЕ ${cnt} прилавков в ${bid} (включая нестандартные — длинные, повёрнутые, угловые, переставленные вручную) и создать заново сетку ${b.rows}×${b.cols} = ${b.rows*b.cols} мест на ${floors[currentFloorIdx].name}?\n\nДанные арендаторов (имя, категория, важность) тоже будут потеряны.\n\nЕсли хочешь только частично перенастроить — отмени и правь существующие прилавки вручную.`)) return;
   generateGrid(bid, true);
   saveAll(); pushHistory();
   buildSVG(); updateStats(); renderEditPanel(); renderFloorTabs();
