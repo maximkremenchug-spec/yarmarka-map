@@ -3048,8 +3048,21 @@ function bindEvents(){
       if(e.key==='-'){e.preventDefault(); zoomOut(); return;}
       if(e.key==='0'){e.preventDefault(); zoomReset(); return;}
     }
-    // стрелки — пан карты (без модификатора)
+    // стрелки — двигают выделение, если что-то выделено в режиме редактирования; иначе панорамят карту
     if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
+      if(editMode && currentTool==='pointer' && selectionSet.size>0){
+        e.preventDefault();
+        const d=e.shiftKey?10:1;
+        const dx = e.key==='ArrowLeft'?-d : e.key==='ArrowRight'?d : 0;
+        const dy = e.key==='ArrowUp'?-d : e.key==='ArrowDown'?d : 0;
+        for(const {type,id} of selectionItems()){
+          if(type==='stall'){const s=stalls[id]; if(s){s.x+=dx; s.y+=dy;}}
+          else if(type==='passage'){const ps=passages.find(p=>p.id===id); if(ps){ps.x+=dx; ps.y+=dy;}}
+          else if(type==='flow'){const f=flows.find(x=>x.id===id); if(f){f.points=f.points.map(p=>[p[0]+dx, p[1]+dy]);}}
+        }
+        saveAll(); pushHistory(); buildSVG();
+        return;
+      }
       e.preventDefault();
       const step=e.shiftKey?200:60;
       if(e.key==='ArrowLeft') wrap.scrollLeft-=step;
