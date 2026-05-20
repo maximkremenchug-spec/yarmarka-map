@@ -96,7 +96,7 @@
   .stall-rect{cursor:pointer;transition:opacity .12s,filter .12s}
   .stall-rect:hover{opacity:.85;filter:brightness(1.3)}
   .stall-rect.form-selected{filter:brightness(1.5);stroke-width:2!important}
-  .stall-rect.edit-selected{filter:brightness(1.45);stroke:#ffe600!important;stroke-width:2.5!important}
+  .stall-rect.edit-selected{filter:brightness(1.45);stroke:#ffe600!important;stroke-width:1!important}
 
   .passage-rect{stroke-width:1;cursor:pointer}
   .passage-rect.edit-selected{stroke:#ffe600!important;stroke-width:2.5!important}
@@ -1325,8 +1325,8 @@ function renderEditSelectionOverlays(svg){
   svg.appendChild(el('rect',{
     x:bb.minX-pad, y:bb.minY-pad,
     width:bb.w+pad*2, height:bb.h+pad*2,
-    fill:'none', stroke:'#ffe600','stroke-width':1.2,
-    'stroke-dasharray':'5,3','pointer-events':'none',
+    fill:'none', stroke:'#ffe600','stroke-width':0.5,
+    'stroke-dasharray':'4,2','pointer-events':'none',
   }));
   if(selectionSet.size>1){
     svg.appendChild(el('text',{
@@ -1343,22 +1343,22 @@ function renderEditSelectionOverlays(svg){
   ];
   for(const c of corners){
     svg.appendChild(el('rect',{
-      x:c.x-5,y:c.y-5,width:10,height:10,
-      fill:'#ffe600',stroke:'#000','stroke-width':1.2,
+      x:c.x-3,y:c.y-3,width:6,height:6,
+      fill:'#ffe600',stroke:'#000','stroke-width':0.5,
       style:`cursor:${c.cur}`,
       'data-kind':'group-resize','data-role':c.role,
     }));
   }
   // ручка поворота — над центром
-  const rotY=bb.minY-pad-22;
+  const rotY=bb.minY-pad-16;
   svg.appendChild(el('line',{
-    x1:bb.cx, y1:bb.minY-pad, x2:bb.cx, y2:rotY+6,
-    stroke:'#ffe600','stroke-width':1.2,
+    x1:bb.cx, y1:bb.minY-pad, x2:bb.cx, y2:rotY+4,
+    stroke:'#ffe600','stroke-width':0.5,
     'pointer-events':'none',
   }));
   svg.appendChild(el('circle',{
-    cx:bb.cx, cy:rotY, r:7,
-    fill:'#ffe600',stroke:'#000','stroke-width':1.5,
+    cx:bb.cx, cy:rotY, r:4,
+    fill:'#ffe600',stroke:'#000','stroke-width':0.6,
     style:'cursor:grab',
     'data-kind':'group-rotate',
   }));
@@ -1401,8 +1401,8 @@ function renderEditSelectionOverlays(svg){
         let mx=(ed.x1+ed.x2)/2, my=(ed.y1+ed.y2)/2;
         if(rot){const dx=mx-cx, dy=my-cy; mx=cx+dx*cs-dy*sn; my=cy+dx*sn+dy*cs;}
         svg.appendChild(el('rect',{
-          x:mx-4, y:my-4, width:8, height:8,
-          fill:'#ffe600', stroke:'#000', 'stroke-width':1.2,
+          x:mx-2.5, y:my-2.5, width:5, height:5,
+          fill:'#ffe600', stroke:'#000', 'stroke-width':0.5,
           style:`cursor:${ed.o==='h'?'ns-resize':'ew-resize'}`,
           'data-kind':'l-side','data-role':ed.role,'data-id':singleForL.id,
         }));
