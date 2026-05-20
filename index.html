@@ -1362,6 +1362,33 @@ function renderEditSelectionOverlays(svg){
     style:'cursor:grab',
     'data-kind':'group-rotate',
   }));
+  // 4 кнопки выравнивания — над рамкой, слева от ручки поворота, видны при ≥2 элементах
+  if(selectionSet.size>=2){
+    const alignY=bb.minY-pad-22;
+    const aBtnX=bb.minX-pad+12;
+    const ALIGN_BTNS=[
+      {role:'left',   x:aBtnX,      label:'⟸', title:'Выровнять по левому краю (Alt+L)'},
+      {role:'right',  x:aBtnX+22,   label:'⟹', title:'Выровнять по правому краю (Alt+R)'},
+      {role:'top',    x:aBtnX+44,   label:'⤒', title:'Выровнять по верхнему краю (Alt+T)'},
+      {role:'bottom', x:aBtnX+66,   label:'⤓', title:'Выровнять по нижнему краю (Alt+B)'},
+    ];
+    for(const b of ALIGN_BTNS){
+      svg.appendChild(el('rect',{
+        x:b.x-9, y:alignY-9, width:18, height:18, rx:3,
+        fill:'#2ecc71', stroke:'#000','stroke-width':1.2,
+        style:'cursor:pointer',
+        'data-kind':'group-align','data-role':b.role,
+      }));
+      svg.appendChild(el('text',{
+        x:b.x, y:alignY+4,
+        'text-anchor':'middle','font-size':14,fill:'#fff','font-weight':'bold',
+        'font-family':'sans-serif','pointer-events':'none',
+      },b.label));
+      // невидимый title через <title>
+      const t=el('title',{},b.title);
+      svg.lastChild.appendChild(t);
+    }
+  }
   // 6 ручек по сторонам для L-углового прилавка
   const singleForL=selectionSingle();
   if(singleForL && singleForL.type==='stall'){
@@ -1467,6 +1494,7 @@ function onSvgMouseDown(e){
 
   if(currentTool==='pointer'){
     if(kind==='flow-vertex'){e.preventDefault(); dragState={type:'flow-vertex', id:tg.dataset.id, idx:+tg.dataset.idx, moved:false}; return;}
+    if(kind==='group-align'){e.preventDefault(); alignSelection(tg.dataset.role); return;}
     if(kind==='l-side'){
       e.preventDefault();
       const id=tg.dataset.id; const role=tg.dataset.role;
@@ -2045,6 +2073,18 @@ document.addEventListener('keydown',e=>{
   } else if(e.key==='Enter'){
     if(drawingFlow){e.preventDefault();finishFlow();}
     else if(drawingSite){e.preventDefault();finishSite();}
+  } else if(e.altKey && /^[lrtbдкеи]$/i.test(e.key)){
+    if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    const k=e.key.toLowerCase();
+    let side=null;
+    if(k==='l'||k==='д') side='left';
+    else if(k==='r'||k==='к') side='right';
+    else if(k==='t'||k==='е') side='top';
+    else if(k==='b'||k==='и') side='bottom';
+    if(side && selectionSet.size>=2){
+      e.preventDefault();
+      alignSelection(side);
+    }
   } else if(e.key==='F2'){
     if(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
     const single=selectionSingle();
@@ -2723,6 +2763,43 @@ function renameStallInEdit(oldId){
     saveAll(); pushHistory();
     buildSVG(); updateStats();
   });
+}
+
+function alignSelection(side){
+  if(selectionSet.size<2) return;
+  const bb=getGroupBBox(); if(!bb) return;
+  let changed=false;
+  for(const {type,id} of selectionItems()){
+    if(type==='stall' || type==='passage'){
+      const t = (type==='stall') ? stalls[id] : passages.find(p=>p.id===id);
+      if(!t) continue;
+      const before={x:t.x,y:t.y};
+      if(side==='left')   t.x = Math.round(bb.minX);
+      if(side==='right')  t.x = Math.round(bb.maxX - t.w);
+      if(side==='top')    t.y = Math.round(bb.minY);
+      if(side==='bottom') t.y = Math.round(bb.maxY - t.h);
+      if(before.x!==t.x || before.y!==t.y) changed=true;
+    } else if(type==='flow'){
+      const f=flows.find(x=>x.id===id);
+      if(!f || !f.points.length) continue;
+      const xs=f.points.map(p=>p[0]), ys=f.points.map(p=>p[1]);
+      const minX=Math.min(...xs), maxX=Math.max(...xs);
+      const minY=Math.min(...ys), maxY=Math.max(...ys);
+      let dx=0, dy=0;
+      if(side==='left')   dx = Math.round(bb.minX - minX);
+      if(side==='right')  dx = Math.round(bb.maxX - maxX);
+      if(side==='top')    dy = Math.round(bb.minY - minY);
+      if(side==='bottom') dy = Math.round(bb.maxY - maxY);
+      if(dx||dy){
+        f.points = f.points.map(p=>[p[0]+dx, p[1]+dy]);
+        changed=true;
+      }
+    }
+  }
+  if(changed){
+    saveAll(); pushHistory();
+    buildSVG(); updateStats();
+  }
 }
 
 function toggleLabelOrient(bid){
