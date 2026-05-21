@@ -267,6 +267,7 @@
     <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий и участка"><span>⬡</span><span class="lbl">Контур</span></button>
     <button class="tool-btn" data-tool="site" onclick="setTool('site')" title="Контур участка — кликай вершины, Enter завершит"><span>🗺</span><span class="lbl">Участок</span></button>
     <button class="tool-btn" onclick="cycleLShape()" title="Сделать выделенные прилавки угловыми (L-формы) / цикл угла / убрать"><span>⌐</span><span class="lbl">Угловой</span></button>
+    <button class="tool-btn" onclick="cyclePShape()" title="Сделать выделенные прилавки П-образными / цикл стороны выреза / убрать"><span>∏</span><span class="lbl">П-форма</span></button>
     <button class="tool-btn" onclick="cycleStallLabelOrient()" title="Повернуть номер в выделенных прилавках (горизонтально / снизу-вверх / сброс к настройке здания)"><span>↻</span><span class="lbl">№ угол</span></button>
     <div class="tool-divider"></div>
     <button class="tool-btn" data-tool="delete" onclick="setTool('delete')" title="Удалить (или ПКМ)"><span>🗑</span><span class="lbl">Удалить</span></button>
@@ -1026,6 +1027,33 @@ function renderBuilding(svg, b){
   }
 }
 
+// П-форма: прямоугольник с прямоугольным вырезом на одной из 4-х сторон (по центру)
+// s.cut = {side:'top'|'bottom'|'left'|'right', cw, ch}
+//   side='bottom' → вырез снизу, открыт вниз (как буква П)
+//   side='top'    → вырез сверху, открыт вверх
+//   side='left'   → вырез слева
+//   side='right'  → вырез справа
+function pPathD(s){
+  const x=s.x,y=s.y,w=s.w,h=s.h;
+  const c=s.cut||{};
+  const side=c.side||'bottom';
+  if(side==='top'||side==='bottom'){
+    const cw=Math.min(Math.max(2,c.cw|0), w-4);
+    const ch=Math.min(Math.max(2,c.ch|0), h-2);
+    const left=Math.round((w-cw)/2);
+    if(side==='bottom') return `M${x},${y} L${x+w},${y} L${x+w},${y+h} L${x+left+cw},${y+h} L${x+left+cw},${y+h-ch} L${x+left},${y+h-ch} L${x+left},${y+h} L${x},${y+h} Z`;
+    // top
+    return `M${x},${y} L${x+left},${y} L${x+left},${y+ch} L${x+left+cw},${y+ch} L${x+left+cw},${y} L${x+w},${y} L${x+w},${y+h} L${x},${y+h} Z`;
+  }
+  // left/right — вырез по вертикали
+  const cw=Math.min(Math.max(2,c.cw|0), w-2);
+  const ch=Math.min(Math.max(2,c.ch|0), h-4);
+  const top=Math.round((h-ch)/2);
+  if(side==='right') return `M${x},${y} L${x+w},${y} L${x+w},${y+top} L${x+w-cw},${y+top} L${x+w-cw},${y+top+ch} L${x+w},${y+top+ch} L${x+w},${y+h} L${x},${y+h} Z`;
+  // left
+  return `M${x},${y} L${x+w},${y} L${x+w},${y+h} L${x},${y+h} L${x},${y+top+ch} L${x+cw},${y+top+ch} L${x+cw},${y+top} L${x},${y+top} Z`;
+}
+
 function lPathD(s){
   const x=s.x,y=s.y,w=s.w,h=s.h;
   const cw=Math.min(Math.max(2,s.cut.cw|0), w-2);
@@ -1128,6 +1156,7 @@ function renderStall(svg, id, s){
   const rot=s.r||0;
   const g = rot ? el('g',{transform:`rotate(${rot.toFixed(2)} ${s.x+s.w/2} ${s.y+s.h/2})`}) : svg;
   const isL = s.shape==='L' && s.cut;
+  const isP = s.shape==='P' && s.cut;
   const stallAttrs={
     id:`stall-${id}`,
     class:'stall-rect'+(imp?'':' sv-stall-empty')+(editMode && isSelected('stall',id) ? ' edit-selected':'')+(!editMode && selectedId===id ? ' form-selected':''),
@@ -1137,6 +1166,9 @@ function renderStall(svg, id, s){
   if(imp){stallAttrs.fill=IMP_COLORS[imp]; stallAttrs.stroke=IMP_STROKE[imp];}
   if(isL){
     stallAttrs.d=lPathD(s);
+    g.appendChild(el('path',stallAttrs));
+  } else if(isP){
+    stallAttrs.d=pPathD(s);
     g.appendChild(el('path',stallAttrs));
   } else {
     stallAttrs.x=s.x; stallAttrs.y=s.y; stallAttrs.width=s.w; stallAttrs.height=s.h; stallAttrs.rx=1.5;
@@ -1667,8 +1699,8 @@ function onDocMouseMove(e){
           target.y=Math.min(y1,y2);
           target.w=Math.max(1,Math.abs(x2-x1));
           target.h=Math.max(1,Math.abs(y2-y1));
-          // L-стол: масштабируем вырез пропорционально
-          if(o.type==='stall' && target.shape==='L' && target.cut && o.cw && o.ch && o.w && o.h){
+          // L/П-стол: масштабируем вырез пропорционально
+          if(o.type==='stall' && (target.shape==='L'||target.shape==='P') && target.cut && o.cw && o.ch && o.w && o.h){
             target.cut.cw=Math.max(2, Math.min(target.w-2, Math.round(o.cw*target.w/o.w)));
             target.cut.ch=Math.max(2, Math.min(target.h-2, Math.round(o.ch*target.h/o.h)));
           }
@@ -2803,6 +2835,29 @@ function alignSelection(side){
     saveAll(); pushHistory();
     buildSVG(); updateStats();
   }
+}
+
+// Цикл П-формы: rect → П-bottom → П-top → П-left → П-right → rect
+const P_CYCLE=['bottom','top','left','right'];
+function cyclePShape(){
+  if(selectionSet.size===0){flashStatus('Сначала выдели прилавок'); return;}
+  let changed=0;
+  for(const {type,id} of selectionItems()){
+    if(type!=='stall') continue;
+    const s=stalls[id]; if(!s) continue;
+    if(s.shape!=='P' || !s.cut){
+      // если был L — сначала снимем его
+      if(s.shape==='L'){delete s.shape; delete s.cut;}
+      s.shape='P';
+      s.cut={cw:Math.max(4,Math.round(s.w/2)), ch:Math.max(4,Math.round(s.h/2)), side:'bottom'};
+    } else {
+      const idx=P_CYCLE.indexOf(s.cut.side||'bottom');
+      if(idx>=P_CYCLE.length-1){ delete s.shape; delete s.cut; }
+      else { s.cut.side=P_CYCLE[idx+1]; }
+    }
+    changed++;
+  }
+  if(changed){ saveAll(); pushHistory(); buildSVG(); flashStatus(`Изменено: ${changed}`); }
 }
 
 // цикл ориентации номера для выделенных прилавков: undefined (наследует от здания) → 'h' → 'v' → undefined
