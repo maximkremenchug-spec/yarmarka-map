@@ -2732,10 +2732,13 @@ function renderEditPanel(){
     const wrap=document.createElement('div');
     wrap.className='ep-bld'+(idx===0?' open':'');
     const cnt=Object.values(stalls).filter(s=>s.building===b.id).length;
+    const pts=parsePath(b.path);
+    const inside=Object.values(stalls).filter(s=>s.building===b.id && pointInPolygon(s.x+s.w/2, s.y+s.h/2, pts)).length;
+    const orphans = cnt - inside;
     wrap.innerHTML=`
       <div class="ep-bld-head">
         <span>${b.id} — ${(b.label.split('—')[1]||b.label).trim()}</span>
-        <span class="ep-count" data-count="${b.id}">${cnt} прилавков</span>
+        <span class="ep-count" data-count="${b.id}">${inside} прилавков${orphans>0?` <span style="color:#e94560;font-weight:700" title="вне контура">+${orphans} вне</span>`:''}</span>
       </div>
       <div class="ep-bld-body">
         <div class="ep-section">Параметры авто-сетки</div>
@@ -2759,6 +2762,7 @@ function renderEditPanel(){
         <button class="btn btn-success" style="width:100%;margin-top:4px" onclick="regenerateGridFor('${b.id}')">🎲 Перегенерировать сетку (${b.rows}×${b.cols} = ${b.rows*b.cols} мест)</button>
         <button class="btn" style="width:100%;margin-top:4px" onclick="renumberBuilding('${b.id}')">🔢 Перенумеровать прилавки (выбрать направление)</button>
         <button class="btn" style="width:100%;margin-top:4px" onclick="toggleLabelOrient('${b.id}')">${b.labelOrient==='v'?'↺ Номера: снизу вверх (вернуть горизонтально)':'↻ Повернуть номера снизу вверх'}</button>
+        ${orphans>0?`<button class="btn btn-danger" style="width:100%;margin-top:4px" onclick="cleanupOrphans('${b.id}')">🧹 Прилавков вне контура: ${orphans} — пере-привязать по геометрии</button>`:''}
         <div class="ep-section">Название</div>
         <input class="inp" type="text" value="${escapeHtml(b.label||'')}" data-bid="${b.id}" data-field="label" placeholder="напр. С6 — Новый корпус">
         <div class="ep-section">Контур (SVG path)</div>
@@ -2900,6 +2904,42 @@ function cycleStallLabelOrient(){
     changed++;
   }
   if(changed){ saveAll(); pushHistory(); buildSVG(); flashStatus(`Повёрнуто: ${changed}`); }
+}
+
+// Прилавки, у которых building=bid, но центр НЕ внутри полигона этого корпуса:
+// определяем в какой полигон они реально попадают и переназначаем;
+// если ни в один — спрашиваем удалить или оставить как «X»
+function cleanupOrphans(bid){
+  const b=BUILDINGS.find(x=>x.id===bid);
+  if(!b) return;
+  const pts=parsePath(b.path);
+  const orphans=[];
+  for(const [id,s] of Object.entries(stalls)){
+    if(s.building!==bid) continue;
+    if(!pointInPolygon(s.x+s.w/2, s.y+s.h/2, pts)) orphans.push([id,s]);
+  }
+  if(orphans.length===0){flashStatus('Осиротевших нет'); return;}
+  // считаем новые привязки
+  let reassigned=0, homeless=0;
+  const changes=[];
+  for(const [id,s] of orphans){
+    const realBid=whichBuilding(s.x+s.w/2, s.y+s.h/2);
+    if(realBid && realBid!==bid){
+      changes.push({id, from:bid, to:realBid});
+      reassigned++;
+    } else if(!realBid){
+      changes.push({id, from:bid, to:null});
+      homeless++;
+    }
+  }
+  if(!confirm(`Найдено ${orphans.length} прилавков в ${bid} вне его контура.\n\nБудет переназначено в другие корпусы: ${reassigned}\nОстанется бесхозными (вне всех контуров): ${homeless} — можно удалить или оставить.\n\nПродолжить?`)) return;
+  for(const ch of changes){
+    if(ch.to) stalls[ch.id].building=ch.to;
+    else if(confirm(`Прилавок ${ch.id} не попадает ни в один контур. Удалить его?`)) delete stalls[ch.id];
+  }
+  saveAll(); pushHistory();
+  buildSVG(); updateStats(); renderEditPanel();
+  flashStatus(`Переназначено: ${reassigned}, удалено/оставлено: ${homeless}`);
 }
 
 function toggleLabelOrient(bid){
