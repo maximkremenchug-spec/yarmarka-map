@@ -984,6 +984,7 @@ function buildSVG(){
   renderSite(svg);
 
   // здания
+  _placedBuildingLabels=[];
   for(const b of BUILDINGS) renderBuilding(svg,b);
 
   // узел сетей в С3
@@ -1011,15 +1012,41 @@ function buildSVG(){
   }
 }
 
+// Глобальный реестр прямоугольников уже размещённых меток корпусов на этом кадре.
+// Используется для автоматического сдвига при пересечении.
+let _placedBuildingLabels=[];
 function renderBuilding(svg, b){
   svg.appendChild(el('path',{id:`bld-${b.id}`,d:b.path,class:'building-outline','pointer-events':'none'}));
-  // ID корпуса — над правым верхним углом контура
+  // ID корпуса — над правым верхним углом контура; смещаем при коллизии
   const pts=parsePath(b.path);
   if(pts.length){
     let minY=pts[0][1], maxX=pts[0][0];
     for(const p of pts){if(p[0]>maxX)maxX=p[0]; if(p[1]<minY)minY=p[1];}
+    // если задан кастомный labelXY — используем его
+    let lx, ly;
+    if(Array.isArray(b.labelXY) && b.labelXY.length===2){
+      lx=b.labelXY[0]; ly=b.labelXY[1];
+    } else {
+      lx=maxX; ly=minY-4;
+    }
+    // приблизительный размер подписи
+    const W = (b.id||'').length * 8.5;   // ширина текста (font-size:13, weight:800)
+    const H = 14;
+    // bbox метки: учитываем text-anchor:'end' — x — правый край
+    const tryRect = (x,y)=>({x:x-W, y:y-H+2, w:W, h:H});
+    let rect = tryRect(lx, ly);
+    // если пересекает уже размещённую — сдвигаем влево/вверх постепенно
+    const overlaps = r => _placedBuildingLabels.some(p=>!(r.x+r.w<p.x || r.x>p.x+p.w || r.y+r.h<p.y || r.y>p.y+p.h));
+    let tries=0;
+    while(overlaps(rect) && tries<10){
+      // сдвиг влево на ширину метки + 4
+      lx -= (W + 4);
+      rect = tryRect(lx, ly);
+      tries++;
+    }
+    _placedBuildingLabels.push(rect);
     svg.appendChild(el('text',{
-      x:maxX, y:minY-4,
+      x:lx, y:ly,
       'font-size':13,'font-weight':800,fill:'#e94560',
       'font-family':'sans-serif','pointer-events':'none','text-anchor':'end',
     }, b.id));
