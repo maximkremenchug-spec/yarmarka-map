@@ -251,7 +251,7 @@
   <div class="header-stats">
     <span>Прилавков: <span class="val" id="st-total">0</span></span>
     <span>Проходов: <span class="val" id="st-passages">0</span></span>
-    <span>Потоков: <span class="val" id="st-flows">0</span></span>
+    <span>Поток: <span class="val" id="st-flows">0</span></span>
     <span>Заполнено: <span class="val" id="st-filled">0</span></span>
     <span class="stat-A">A: <span id="st-A">0</span></span>
     <span class="stat-B">B: <span id="st-B">0</span></span>
@@ -2372,7 +2372,8 @@ function updateStats(){
   }
   document.getElementById('st-total').textContent=total;
   document.getElementById('st-passages').textContent=passages.length;
-  document.getElementById('st-flows').textContent=flows.length;
+  const totalFlowPeople = flows.reduce((sum,f)=>sum + (parseInt(f.count,10)||0), 0);
+  document.getElementById('st-flows').textContent=totalFlowPeople.toLocaleString('ru-RU');
   document.getElementById('st-filled').textContent=filled;
   for(const k of'ABCD')document.getElementById('st-'+k).textContent=c[k];
   document.getElementById('progress-fill').style.width=(total?filled/total*100:0)+'%';
