@@ -2360,12 +2360,20 @@ function moveTooltip(e){
 
 // ═══════════════ СТАТИСТИКА / CSV ═══════════════
 function updateStats(){
-  const c={A:0,B:0,C:0,D:0};let filled=0;
+  // считаем только прилавки, центр которых попадает в какой-то контур корпуса
+  const bldPolys = BUILDINGS.map(b=>({id:b.id, pts:parsePath(b.path)}));
+  const inside = (s)=>{
+    const cx=s.x+s.w/2, cy=s.y+s.h/2;
+    for(const bp of bldPolys){ if(pointInPolygon(cx,cy,bp.pts)) return true; }
+    return false;
+  };
+  const c={A:0,B:0,C:0,D:0};let filled=0; let total=0;
   for(const d of Object.values(stalls)){
+    if(!inside(d)) continue;
+    total++;
     if(d.tenant||d.importance)filled++;
     if(d.importance)c[d.importance]++;
   }
-  const total=Object.keys(stalls).length;
   document.getElementById('st-total').textContent=total;
   document.getElementById('st-passages').textContent=passages.length;
   document.getElementById('st-flows').textContent=flows.length;
