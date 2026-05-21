@@ -248,6 +248,7 @@
 
 <header>
   <h1>🏪 План</h1>
+  <div class="floor-tabs" id="floor-tabs" style="flex:1;margin:0 18px"></div>
   <div class="header-stats">
     <span>Прилавков: <span class="val" id="st-total">0</span></span>
     <span>Проходов: <span class="val" id="st-passages">0</span></span>
@@ -267,8 +268,6 @@
   <button class="btn btn-icon" id="btn-redo" onclick="redo()" title="Повторить (Cmd+Shift+Z)" disabled>↷</button>
   <button class="btn btn-success" onclick="toggleEdit()" id="btn-edit">⚙ Режим редактирования</button>
 </div>
-
-<div class="floor-tabs" id="floor-tabs"></div>
 
 <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
 
