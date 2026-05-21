@@ -1389,12 +1389,17 @@ function renderEditSelectionOverlays(svg){
       'font-size':10, fill:'#ffe600','font-family':'sans-serif','font-weight':700,'pointer-events':'none',
     }, `выделено: ${selectionSet.size}`));
   }
-  // 4 угловые ручки ресайза
+  // 4 угловые + 4 боковые ручки ресайза
   const corners=[
     {role:'nw',x:bb.minX-pad,y:bb.minY-pad,cur:'nwse-resize'},
     {role:'ne',x:bb.maxX+pad,y:bb.minY-pad,cur:'nesw-resize'},
     {role:'sw',x:bb.minX-pad,y:bb.maxY+pad,cur:'nesw-resize'},
     {role:'se',x:bb.maxX+pad,y:bb.maxY+pad,cur:'nwse-resize'},
+    // боковые ручки — меняют только одну ось
+    {role:'n', x:(bb.minX+bb.maxX)/2, y:bb.minY-pad,           cur:'ns-resize'},
+    {role:'s', x:(bb.minX+bb.maxX)/2, y:bb.maxY+pad,           cur:'ns-resize'},
+    {role:'w', x:bb.minX-pad,         y:(bb.minY+bb.maxY)/2,   cur:'ew-resize'},
+    {role:'e', x:bb.maxX+pad,         y:(bb.minY+bb.maxY)/2,   cur:'ew-resize'},
   ];
   for(const c of corners){
     svg.appendChild(el('rect',{
@@ -1572,7 +1577,11 @@ function onSvgMouseDown(e){
       if(role==='nw') anchor={x:bb.maxX, y:bb.maxY};
       else if(role==='ne') anchor={x:bb.minX, y:bb.maxY};
       else if(role==='sw') anchor={x:bb.maxX, y:bb.minY};
-      else                  anchor={x:bb.minX, y:bb.minY};
+      else if(role==='se') anchor={x:bb.minX, y:bb.minY};
+      else if(role==='n')  anchor={x:bb.minX, y:bb.maxY}; // тянем верх — низ фиксируем
+      else if(role==='s')  anchor={x:bb.minX, y:bb.minY}; // тянем низ — верх фиксируем
+      else if(role==='w')  anchor={x:bb.maxX, y:bb.minY}; // тянем лево — право фиксируем
+      else                  anchor={x:bb.minX, y:bb.minY}; // 'e' — тянем право — лево фиксируем
       const origs=selectionItems().map(({type,id})=>{
         if(type==='stall'){const s=stalls[id]; return s?{type,id,x:s.x,y:s.y,w:s.w,h:s.h,r:s.r||0, cw:s.cut?.cw, ch:s.cut?.ch}:null;}
         if(type==='passage'){const ps=passages.find(p=>p.id===id); return ps?{type,id,x:ps.x,y:ps.y,w:ps.w,h:ps.h,r:ps.r||0}:null;}
@@ -1706,12 +1715,16 @@ function onDocMouseMove(e){
   if(dragState){
     const p=svgPoint(e);
     if(dragState.type==='group-resize'){
-      let sx=(p.x-dragState.anchor.x)/(dragState.role==='nw'||dragState.role==='sw'?-dragState.origW:dragState.origW);
-      let sy=(p.y-dragState.anchor.y)/(dragState.role==='nw'||dragState.role==='ne'?-dragState.origH:dragState.origH);
+      const role=dragState.role;
+      let sx=(p.x-dragState.anchor.x)/((role==='nw'||role==='sw'||role==='w')?-dragState.origW:dragState.origW);
+      let sy=(p.y-dragState.anchor.y)/((role==='nw'||role==='ne'||role==='n')?-dragState.origH:dragState.origH);
+      // боковые ручки — только одна ось меняется, другая остаётся как была (sx=1 или sy=1)
+      if(role==='n'||role==='s') sx=1;
+      if(role==='w'||role==='e') sy=1;
       // защита от нулевого/слишком маленького масштаба
       if(Math.abs(sx)<0.1) sx=sx<0?-0.1:0.1;
       if(Math.abs(sy)<0.1) sy=sy<0?-0.1:0.1;
-      if(e.shiftKey){const s=Math.min(Math.abs(sx),Math.abs(sy)); sx=Math.sign(sx)*s; sy=Math.sign(sy)*s;}
+      if(e.shiftKey && !(role==='n'||role==='s'||role==='w'||role==='e')){const s=Math.min(Math.abs(sx),Math.abs(sy)); sx=Math.sign(sx)*s; sy=Math.sign(sy)*s;}
       for(const o of dragState.origs){
         if(o.type==='stall'||o.type==='passage'){
           const target=o.type==='stall'?stalls[o.id]:passages.find(p=>p.id===o.id);
