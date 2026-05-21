@@ -890,29 +890,48 @@ function toggleTheme(){
 applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
 
 // ─── ZOOM ───
+// zoom = логический множитель к "100%" (где 100% = подгонка под видимую область)
 let zoom=1;
+let fitScale=1; // абсолютный CSS-масштаб, при котором SVG целиком помещается во вьюпорт
 const ZOOM_MIN=0.1, ZOOM_MAX=30;
-function setZoom(z, pivot){
-  z=Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
-  if(Math.abs(z-zoom)<0.001) return;
+function recalcFitScale(){
+  const wrap=document.querySelector('.map-wrap');
+  if(!wrap) return 1;
+  // оставляем небольшой запас по краям
+  const padW=40, padH=40;
+  const aw=Math.max(50, wrap.clientWidth - padW);
+  const ah=Math.max(50, wrap.clientHeight - padH);
+  fitScale = Math.min(aw/800, ah/950);
+  if(!isFinite(fitScale) || fitScale<=0) fitScale=1;
+  return fitScale;
+}
+function applyZoom(pivot){
   const wrap=document.querySelector('.map-wrap');
   const sizer=document.getElementById('svg-sizer');
   const svg=document.getElementById('ymap');
-  zoom=z;
-  // sizer задаёт layout-размер (для скроллбаров), SVG масштабируется CSS-transform'ом
-  sizer.style.width  = (800*zoom)+'px';
-  sizer.style.height = (950*zoom)+'px';
-  svg.style.transform = `scale(${zoom})`;
+  if(!wrap||!sizer||!svg) return;
+  const eff = zoom*fitScale; // эффективный CSS-масштаб
+  sizer.style.width  = (800*eff)+'px';
+  sizer.style.height = (950*eff)+'px';
+  svg.style.transform = `scale(${eff})`;
   const lbl=document.getElementById('zoom-pct');
   if(lbl) lbl.textContent=Math.round(zoom*100)+'%';
   if(pivot){
-    wrap.scrollLeft = pivot.worldX*zoom - pivot.localX;
-    wrap.scrollTop  = pivot.worldY*zoom - pivot.localY;
+    wrap.scrollLeft = pivot.worldX*eff - pivot.localX;
+    wrap.scrollTop  = pivot.worldY*eff - pivot.localY;
   }
+}
+function setZoom(z, pivot){
+  z=Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+  if(Math.abs(z-zoom)<0.001 && !pivot) return;
+  zoom=z;
+  applyZoom(pivot);
 }
 function zoomIn(){setZoom(zoom*1.25); setTimeout(centerView,30);}
 function zoomOut(){setZoom(zoom/1.25); setTimeout(centerView,30);}
-function zoomReset(){setZoom(1); setTimeout(centerView,30);}
+function zoomReset(){ recalcFitScale(); zoom=1; applyZoom(); setTimeout(centerView,30); }
+// при изменении размера окна — пересчитываем fitScale; если на "100%", обновляем рендер
+window.addEventListener('resize', ()=>{ recalcFitScale(); applyZoom(); setTimeout(centerView,30); });
 // центрирует видимый SVG в видимой части map-wrap (учитывает реальную позицию sizer)
 function centerView(){
   const wrap=document.querySelector('.map-wrap');
@@ -3384,7 +3403,8 @@ buildSVG();
 bindEvents();
 updateStats();
 pushHistory(); // начальный снапшот
-setTimeout(centerView, 50);
+// 100% = подгонка под видимую область
+setTimeout(()=>{ recalcFitScale(); applyZoom(); centerView(); }, 30);
 </script>
 
 </body>
