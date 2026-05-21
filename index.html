@@ -2881,8 +2881,10 @@ function renderEditPanel(){
         <span class="ep-count" data-count="${b.id}">${inside} прилавков${orphans>0?` <span style="color:#e94560;font-weight:700" title="вне контура">+${orphans} вне</span>`:''}</span>
       </div>
       <div class="ep-bld-body">
-        <div class="ep-section">Площадь корпуса</div>
-        <input class="inp" type="number" min="0" step="1" value="${b.area||0}" data-bid="${b.id}" data-field="area" placeholder="напр. 1200, м²">
+        <div class="ep-section">Корпус</div>
+        <div class="ep-row">
+          <div class="ep-col" style="flex:1"><label>Площадь корпуса, м²</label><input type="number" min="0" step="1" value="${b.area||0}" data-bid="${b.id}" data-field="area" placeholder="напр. 1200"></div>
+        </div>
         <div class="ep-section">Итого по павильонам</div>
         <div class="ep-row">
           <div class="ep-col" style="flex:1"><label>Общая аренда, ₽</label><input type="text" value="${fmtN(totalRent,0)}" readonly style="opacity:.8;font-weight:600"></div>
