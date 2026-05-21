@@ -2872,25 +2872,9 @@ function renderEditPanel(){
         <span class="ep-count" data-count="${b.id}">${inside} прилавков${orphans>0?` <span style="color:#e94560;font-weight:700" title="вне контура">+${orphans} вне</span>`:''}</span>
       </div>
       <div class="ep-bld-body">
-        <div class="ep-section">Параметры авто-сетки</div>
-        <div class="ep-row">
-          <div class="ep-col"><label>Рядов</label><input type="number" min="1" max="40" value="${b.rows}" data-bid="${b.id}" data-field="rows"></div>
-          <div class="ep-col"><label>В ряду</label><input type="number" min="1" max="40" value="${b.cols}" data-bid="${b.id}" data-field="cols"></div>
-          <div class="ep-col"><label>Зазор X</label><input type="number" min="0" max="20" step="0.5" value="${b.gapX}" data-bid="${b.id}" data-field="gapX"></div>
-          <div class="ep-col"><label>Зазор Y</label><input type="number" min="0" max="20" step="0.5" value="${b.gapY}" data-bid="${b.id}" data-field="gapY"></div>
-        </div>
-        <div class="ep-row">
-          <div class="ep-col"><label>X</label><input type="number" value="${b.stallArea.x}" data-bid="${b.id}" data-field="ax"></div>
-          <div class="ep-col"><label>Y</label><input type="number" value="${b.stallArea.y}" data-bid="${b.id}" data-field="ay"></div>
-          <div class="ep-col"><label>Ширина</label><input type="number" value="${b.stallArea.w}" data-bid="${b.id}" data-field="aw"></div>
-          <div class="ep-col"><label>Высота</label><input type="number" value="${b.stallArea.h}" data-bid="${b.id}" data-field="ah"></div>
-        </div>
         <div class="ep-section">Площадь корпуса</div>
-        <div class="ep-row">
-          <div class="ep-col" style="flex:2"><label>Площадь, м²</label><input type="number" min="0" step="1" value="${b.area||0}" data-bid="${b.id}" data-field="area" placeholder="напр. 1200"></div>
-          <div class="ep-col"><label>Контур (px²)</label><input type="text" value="${Math.round(polygonAreaPx(parsePath(b.path)))}" readonly style="opacity:.6"></div>
-        </div>
-        <button class="btn btn-success" style="width:100%;margin-top:4px" onclick="regenerateGridFor('${b.id}')">🎲 Перегенерировать сетку (${b.rows}×${b.cols} = ${b.rows*b.cols} мест)</button>
+        <input class="inp" type="number" min="0" step="1" value="${b.area||0}" data-bid="${b.id}" data-field="area" placeholder="напр. 1200, м²">
+        <button class="btn btn-success" style="width:100%;margin-top:8px" onclick="regenerateGridFor('${b.id}')">🎲 Перегенерировать сетку (${b.rows}×${b.cols} = ${b.rows*b.cols} мест)</button>
         <button class="btn" style="width:100%;margin-top:4px" onclick="renumberBuilding('${b.id}')">🔢 Перенумеровать прилавки (выбрать направление)</button>
         <button class="btn" style="width:100%;margin-top:4px" onclick="toggleLabelOrient('${b.id}')">${b.labelOrient==='v'?'↺ Номера: снизу вверх (вернуть горизонтально)':'↻ Повернуть номера снизу вверх'}</button>
         ${orphans>0?`<button class="btn btn-danger" style="width:100%;margin-top:4px" onclick="cleanupOrphans('${b.id}')">🧹 Прилавков вне контура: ${orphans} — пере-привязать по геометрии</button>`:''}
@@ -2902,8 +2886,6 @@ function renderEditPanel(){
         </div>
         <div class="ep-section">Название</div>
         <input class="inp" type="text" value="${escapeHtml(b.label||'')}" data-bid="${b.id}" data-field="label" placeholder="напр. С6 — Новый корпус">
-        <div class="ep-section">Контур (SVG path)</div>
-        <textarea class="inp" rows="3" style="font-size:10px;font-family:monospace" data-bid="${b.id}" data-field="path">${b.path}</textarea>
         <button class="btn btn-danger" style="width:100%;margin-top:8px" onclick="deleteBuilding('${b.id}')">🗑 Удалить корпус ${b.id}</button>
       </div>`;
     body.appendChild(wrap);
