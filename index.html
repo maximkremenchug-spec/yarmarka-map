@@ -679,7 +679,7 @@ function loadAll(){
     }
   }catch{}
 
-  floors=[{name:'1 этаж', stalls:oldStalls, passages:oldPassages, buildings:oldBuildings, flows:[]}];
+  floors=[{name:'1-й этаж', stalls:oldStalls, passages:oldPassages, buildings:oldBuildings, flows:[]}];
   currentFloorIdx=0;
   syncAliases();
 }
@@ -758,7 +758,7 @@ function generateGrid(buildingId, replace=false){
 
 function ensureInitial(){
   if(floors.length===0){
-    floors.push(makeEmptyFloor('1 этаж'));
+    floors.push(makeEmptyFloor('1-й этаж'));
     currentFloorIdx=0;
     syncAliases();
   }
@@ -824,7 +824,7 @@ function switchFloor(idx){
 }
 
 function addFloor(){
-  myPrompt('Название нового этажа:',`Этаж ${floors.length+1}`).then(name=>{
+  myPrompt('Название нового этажа:',`${floors.length+1}-й этаж`).then(name=>{
     if(!name)return;
     const buildings=JSON.parse(JSON.stringify(floors[currentFloorIdx].buildings));
     floors.push({name:name.trim(), stalls:{}, passages:[], buildings, flows:[]});
