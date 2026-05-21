@@ -248,7 +248,6 @@
 
 <header>
   <h1>🏪 План</h1>
-  <div class="floor-tabs" id="floor-tabs" style="flex:1;margin:0 18px"></div>
   <div class="header-stats">
     <span>Прилавков: <span class="val" id="st-total">0</span></span>
     <span>Проходов: <span class="val" id="st-passages">0</span></span>
@@ -262,7 +261,7 @@
 </header>
 
 <div class="toolbar">
-  <div class="spacer"></div>
+  <div class="floor-tabs" id="floor-tabs" style="flex:1"></div>
   <button class="btn btn-icon" id="btn-theme" onclick="toggleTheme()" title="Светлая / тёмная тема">🌓</button>
   <button class="btn btn-icon" id="btn-undo" onclick="undo()" title="Отменить (Cmd+Z)" disabled>↶</button>
   <button class="btn btn-icon" id="btn-redo" onclick="redo()" title="Повторить (Cmd+Shift+Z)" disabled>↷</button>
