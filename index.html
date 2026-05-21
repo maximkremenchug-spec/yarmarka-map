@@ -1129,16 +1129,34 @@ function renderSite(svg){
     stroke:'#6a8eb0','stroke-width':1.6,
     'stroke-dasharray':'8,5','pointer-events':'none',
   }));
-  if(site.label){
+  if(site.label || editMode){
     const lx=(site.labelXY&&site.labelXY[0])||pts[0][0]+10;
     const ly=(site.labelXY&&site.labelXY[1])||pts[0][1]+22;
-    svg.appendChild(el('text',{
-      x:lx, y:ly,
-      'font-size':18,'font-weight':700,fill:'#9ec3e8',
-      'font-family':'sans-serif',
-      'data-kind':'site-label',
-      style: editMode?'cursor:text':'cursor:default',
-    },site.label));
+    if(site.label){
+      svg.appendChild(el('text',{
+        x:lx, y:ly,
+        'font-size':18,'font-weight':700,fill:'#9ec3e8',
+        'font-family':'sans-serif',
+        'data-kind':'site-label',
+        style: editMode?'cursor:text':'cursor:default',
+      },site.label));
+    }
+    // ✕ удалить контур участка — только в режиме редактирования
+    if(editMode){
+      const labelW=(site.label||'').length*9+8;
+      const bx=lx+labelW, by=ly-12;
+      svg.appendChild(el('circle',{
+        cx:bx+8, cy:by+8, r:9,
+        fill:'#e74c3c', stroke:'#000','stroke-width':0.6,
+        style:'cursor:pointer',
+        'data-kind':'site-delete',
+      }));
+      svg.appendChild(el('text',{
+        x:bx+8, y:by+11,
+        'text-anchor':'middle','font-size':12,'font-weight':700,
+        fill:'#fff','font-family':'sans-serif','pointer-events':'none',
+      },'✕'));
+    }
   }
   // ручки вершин в режиме «Контур»
   if(editMode && currentTool==='vertex'){
@@ -1518,6 +1536,12 @@ function onSvgMouseDown(e){
       e.preventDefault();
       vertexDragging={site:true,idx:+tg.dataset.idx};
     }
+    return;
+  }
+
+  if(kind==='site-delete'){
+    e.preventDefault();
+    clearSite();
     return;
   }
 
