@@ -220,6 +220,24 @@
   .zoom-ctrl button:hover{background:var(--hover-bg);color:var(--on-accent)}
   .zoom-ctrl .zoom-pct{min-width:46px;text-align:center;font-size:11px;color:var(--text-dimmer);font-family:monospace}
 
+
+  /* ── PDF/print: только план без UI ── */
+  @media print, .pdf-mode {
+    body { background:#fff !important; color:#000 !important; }
+    .header, .tool-palette, .edit-panel, .floor-tabs, .zoom-controls, .modal-overlay, #tooltip { display:none !important; }
+    .main, .map-wrap, .pan-area { background:#fff !important; padding:0 !important; margin:0 !important; overflow:visible !important; height:auto !important; display:block !important; }
+    .svg-sizer { transform:none !important; width:auto !important; height:auto !important; }
+    .ymap { width:100% !important; height:auto !important; max-width:none !important; background:#fff !important; }
+    /* убираем подсветку выделения */
+    .stall-rect.edit-selected, .stall-rect.form-selected, .passage-rect.edit-selected { stroke-width:0.5 !important; filter:none !important; }
+  }
+  body.pdf-mode { background:#fff !important; }
+  body.pdf-mode .header, body.pdf-mode .tool-palette, body.pdf-mode .edit-panel, body.pdf-mode .floor-tabs, body.pdf-mode .zoom-controls, body.pdf-mode .modal-overlay, body.pdf-mode #tooltip { display:none !important; }
+  body.pdf-mode .main, body.pdf-mode .map-wrap, body.pdf-mode .pan-area { background:#fff !important; padding:0 !important; margin:0 !important; overflow:visible !important; height:auto !important; display:block !important; }
+  body.pdf-mode .svg-sizer { transform:none !important; width:auto !important; height:auto !important; }
+  body.pdf-mode .ymap { width:100% !important; height:auto !important; max-width:none !important; background:#fff !important; }
+  body.pdf-mode .stall-rect.edit-selected, body.pdf-mode .stall-rect.form-selected, body.pdf-mode .passage-rect.edit-selected { stroke-width:0.5 !important; filter:none !important; }
+  body.pdf-mode .sv-bg-plot, body.pdf-mode .sv-bg-canvas { fill:#ffffff !important; }
 </style>
 </head>
 <body class="tool-pointer">
@@ -2627,6 +2645,25 @@ function openFromContent(jsonText, filename){
   updateStats();
   setTimeout(centerView, 50);
 }
+// API для PDF-экспорта из Electron main: переключаем pdf-mode на body
+function enterPdfMode(){
+  document.body.classList.add('pdf-mode');
+  // снимаем зум + панорамирование, чтобы Chromium отрендерил SVG целиком
+  const sizer=document.getElementById('svg-sizer');
+  if(sizer){ sizer.dataset.prevTransform=sizer.style.transform||''; sizer.style.transform='none'; }
+  return true;
+}
+function exitPdfMode(){
+  document.body.classList.remove('pdf-mode');
+  const sizer=document.getElementById('svg-sizer');
+  if(sizer && sizer.dataset.prevTransform!==undefined){ sizer.style.transform=sizer.dataset.prevTransform; delete sizer.dataset.prevTransform; }
+  return true;
+}
+function getPlanTitleForFile(){
+  const f=floors[currentFloorIdx];
+  return (f && f.name ? f.name : 'план').replace(/[\/\\:*?"<>|]/g,'-');
+}
+
 function getXLSXBase64(){
   if(typeof XLSX==='undefined') return null;
   const wb=buildXLSXWorkbook();
