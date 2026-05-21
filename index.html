@@ -1016,7 +1016,9 @@ function buildSVG(){
 // Используется для автоматического сдвига при пересечении.
 let _placedBuildingLabels=[];
 function renderBuilding(svg, b){
-  svg.appendChild(el('path',{id:`bld-${b.id}`,d:b.path,class:'building-outline','pointer-events':'none'}));
+  const pathAttrs={id:`bld-${b.id}`,d:b.path,class:'building-outline','pointer-events':'none'};
+  if(b.fillColor){ pathAttrs.fill=b.fillColor; pathAttrs.style=`fill:${b.fillColor}`; }
+  svg.appendChild(el('path', pathAttrs));
   // ID корпуса — над правым верхним углом контура; смещаем при коллизии
   const pts=parsePath(b.path);
   if(pts.length){
@@ -2892,6 +2894,12 @@ function renderEditPanel(){
         <button class="btn" style="width:100%;margin-top:4px" onclick="renumberBuilding('${b.id}')">🔢 Перенумеровать прилавки (выбрать направление)</button>
         <button class="btn" style="width:100%;margin-top:4px" onclick="toggleLabelOrient('${b.id}')">${b.labelOrient==='v'?'↺ Номера: снизу вверх (вернуть горизонтально)':'↻ Повернуть номера снизу вверх'}</button>
         ${orphans>0?`<button class="btn btn-danger" style="width:100%;margin-top:4px" onclick="cleanupOrphans('${b.id}')">🧹 Прилавков вне контура: ${orphans} — пере-привязать по геометрии</button>`:''}
+        <div class="ep-section">Цвет подложки</div>
+        <div class="ep-row" style="align-items:center;gap:8px">
+          <input type="color" value="${b.fillColor||'#f0f4f9'}" data-bid="${b.id}" data-field="fillColor" style="width:42px;height:32px;border:1px solid var(--border);border-radius:6px;cursor:pointer;padding:2px;background:transparent">
+          <input class="inp" type="text" value="${b.fillColor||''}" data-bid="${b.id}" data-field="fillColor" placeholder="#rrggbb или пусто" style="flex:1">
+          <button class="btn" type="button" onclick="clearBuildingFill('${b.id}')" title="Сбросить цвет">↻</button>
+        </div>
         <div class="ep-section">Название</div>
         <input class="inp" type="text" value="${escapeHtml(b.label||'')}" data-bid="${b.id}" data-field="label" placeholder="напр. С6 — Новый корпус">
         <div class="ep-section">Контур (SVG path)</div>
@@ -2915,6 +2923,19 @@ function onConfigChange(e){
     b.path=v;
   } else if(field==='label'){
     b.label=e.target.value;
+  } else if(field==='fillColor'){
+    const v=e.target.value.trim();
+    if(!v){ delete b.fillColor; }
+    else if(/^#[0-9a-fA-F]{3,8}$/.test(v) || v.startsWith('rgb') || v.startsWith('hsl')) b.fillColor=v;
+    else return;
+    // синхронизация color/text inputs друг с другом
+    const partnerSel = e.target.type==='color'
+      ? `input[type="text"][data-bid="${bid}"][data-field="fillColor"]`
+      : `input[type="color"][data-bid="${bid}"][data-field="fillColor"]`;
+    const partner = document.querySelector(partnerSel);
+    if(partner && partner.value !== e.target.value){
+      partner.value = b.fillColor || (e.target.type==='color' ? '#f0f4f9' : '');
+    }
   } else {
     const v=parseFloat(e.target.value);
     if(isNaN(v))return;
@@ -2932,6 +2953,13 @@ function onConfigChange(e){
   }
   saveAll();
   buildSVG();
+}
+
+function clearBuildingFill(bid){
+  const b=BUILDINGS.find(x=>x.id===bid);
+  if(!b) return;
+  delete b.fillColor;
+  saveAll(); pushHistory(); buildSVG(); renderEditPanel();
 }
 
 function regenerateGridFor(bid){
