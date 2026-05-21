@@ -1045,11 +1045,15 @@ function renderBuilding(svg, b){
       tries++;
     }
     _placedBuildingLabels.push(rect);
-    svg.appendChild(el('text',{
+    const labelAttrs={
       x:lx, y:ly,
       'font-size':13,'font-weight':800,fill:'#e94560',
-      'font-family':'sans-serif','pointer-events':'none','text-anchor':'end',
-    }, b.id));
+      'font-family':'sans-serif','text-anchor':'end',
+      'data-bid':b.id, 'data-kind':'bld-label',
+    };
+    if(editMode){ labelAttrs.style='cursor:move'; }
+    else { labelAttrs['pointer-events']='none'; }
+    svg.appendChild(el('text', labelAttrs, b.id));
   }
 }
 
@@ -1560,6 +1564,18 @@ function onSvgMouseDown(e){
     return;
   }
 
+  // перетаскивание подписи корпуса (в любом инструменте, лишь бы был режим редактирования)
+  if(kind==='bld-label'){
+    e.preventDefault();
+    const bid=tg.dataset.bid;
+    const b=BUILDINGS.find(x=>x.id===bid);
+    if(!b) return;
+    // текущая позиция метки
+    const cur = (Array.isArray(b.labelXY)&&b.labelXY.length===2) ? [b.labelXY[0],b.labelXY[1]] : [parseFloat(tg.getAttribute('x'))||0, parseFloat(tg.getAttribute('y'))||0];
+    dragState={type:'bld-label', bid, origX:cur[0], origY:cur[1], startX:p.x, startY:p.y, moved:false};
+    return;
+  }
+
   if(currentTool==='pointer'){
     if(kind==='flow-vertex'){e.preventDefault(); dragState={type:'flow-vertex', id:tg.dataset.id, idx:+tg.dataset.idx, moved:false}; return;}
     if(kind==='group-align'){e.preventDefault(); alignSelection(tg.dataset.role); return;}
@@ -1802,6 +1818,17 @@ function onDocMouseMove(e){
       const f=flows.find(x=>x.id===dragState.id);
       if(f){
         f.points[dragState.idx]=[Math.round(p.x), Math.round(p.y)];
+        if(!dragState.moved) dragState.moved=true;
+        buildSVG();
+      }
+      return;
+    }
+    if(dragState.type==='bld-label'){
+      const b=BUILDINGS.find(x=>x.id===dragState.bid);
+      if(b){
+        const nx=Math.round(dragState.origX + (p.x-dragState.startX));
+        const ny=Math.round(dragState.origY + (p.y-dragState.startY));
+        b.labelXY=[nx,ny];
         if(!dragState.moved) dragState.moved=true;
         buildSVG();
       }
