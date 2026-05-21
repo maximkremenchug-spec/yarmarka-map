@@ -1198,18 +1198,23 @@ function renderStall(svg, id, s){
   // у прилавка может быть свой s.labelOrient (перекрывает настройку здания)
   const b=BUILDINGS.find(x=>x.id===s.building);
   const labelV = s.labelOrient ? (s.labelOrient==='v') : (b && b.labelOrient==='v');
-  const fitsH=s.w>=18 && s.h>=14;
-  const fitsV=s.h>=18 && s.w>=14;
-  if((labelV?fitsV:fitsH)){
-    const num=id.split('-').pop();
+  // считаем размер шрифта, который реально влезет с минимальным отступом
+  const num=id.split('-').pop();
+  const chars=Math.max(1, num.length);
+  const PAD=0.6;                          // отступ от стенки в пикселях
+  const CHAR_W=0.58;                       // средняя ширина цифры в долях fontSize (sans-serif)
+  // при labelV высота-надпись = ширина клетки, ширина-надпись = высота клетки
+  const availH = (labelV ? s.w : s.h) - PAD*2;
+  const availW = (labelV ? s.h : s.w) - PAD*2;
+  const fsByH = availH * 0.95;             // высота буквы ≈ fontSize
+  const fsByW = availW / (chars * CHAR_W); // ширина строки = chars*fontSize*CHAR_W
+  const fs=Math.max(2.5, Math.min(9, Math.min(fsByH, fsByW)));
+  if(availH>=2.5 && availW>=2.5){
     const cx=s.x+s.w/2, cy=s.y+s.h/2+1;
-    const fs=labelV
-      ? Math.max(6,Math.min(9,Math.min(s.w*0.4,s.h*0.32)))
-      : Math.max(6,Math.min(9,Math.min(s.h*0.4,s.w*0.32)));
     const tAttrs={
       x:cx,y:cy,
       'text-anchor':'middle','dominant-baseline':'central',
-      'font-size':fs.toFixed(1),
+      'font-size':fs.toFixed(2),
       fill:imp?'rgba(255,255,255,.78)':'rgba(100,160,220,.5)',
       'pointer-events':'none','font-family':'sans-serif',
     };
