@@ -267,6 +267,7 @@
     <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий и участка"><span>⬡</span><span class="lbl">Контур</span></button>
     <button class="tool-btn" data-tool="site" onclick="setTool('site')" title="Контур участка — кликай вершины, Enter завершит"><span>🗺</span><span class="lbl">Участок</span></button>
     <button class="tool-btn" onclick="cycleLShape()" title="Сделать выделенные прилавки угловыми (L-формы) / цикл угла / убрать"><span>⌐</span><span class="lbl">Угловой</span></button>
+    <button class="tool-btn" onclick="cycleStallLabelOrient()" title="Повернуть номер в выделенных прилавках (горизонтально / снизу-вверх / сброс к настройке здания)"><span>↻</span><span class="lbl">№ угол</span></button>
     <div class="tool-divider"></div>
     <button class="tool-btn" data-tool="delete" onclick="setTool('delete')" title="Удалить (или ПКМ)"><span>🗑</span><span class="lbl">Удалить</span></button>
   </div>
@@ -418,6 +419,7 @@ const ZONE_TYPES={
   wait:    {label:'Зона ожидания',     fill:'rgba(243,156,18,.18)', stroke:'#f39c12', dash:''},
   reserve: {label:'Резерв / план',     fill:'rgba(46,204,113,.15)', stroke:'#2ecc71', dash:'6,4'},
   dead:    {label:'Мёртвая зона',      fill:'rgba(120,120,130,.22)',stroke:'#7f8c8d', dash:'2,3'},
+  partition:{label:'Перегородка / стена',fill:'rgba(60,40,30,.55)',  stroke:'#3e2723', dash:''},
 };
 
 // ═══════════════ ШАБЛОН ЗДАНИЙ ═══════════════
@@ -1141,8 +1143,9 @@ function renderStall(svg, id, s){
     g.appendChild(el('rect',stallAttrs));
   }
   // ориентация номера внутри клетки: 'h' (по умолчанию) или 'v' (снизу вверх — поворот -90°)
+  // у прилавка может быть свой s.labelOrient (перекрывает настройку здания)
   const b=BUILDINGS.find(x=>x.id===s.building);
-  const labelV=b && b.labelOrient==='v';
+  const labelV = s.labelOrient ? (s.labelOrient==='v') : (b && b.labelOrient==='v');
   const fitsH=s.w>=18 && s.h>=14;
   const fitsV=s.h>=18 && s.w>=14;
   if((labelV?fitsV:fitsH)){
@@ -2800,6 +2803,22 @@ function alignSelection(side){
     saveAll(); pushHistory();
     buildSVG(); updateStats();
   }
+}
+
+// цикл ориентации номера для выделенных прилавков: undefined (наследует от здания) → 'h' → 'v' → undefined
+function cycleStallLabelOrient(){
+  if(selectionSet.size===0){flashStatus('Сначала выдели прилавок'); return;}
+  let changed=0;
+  for(const {type,id} of selectionItems()){
+    if(type!=='stall') continue;
+    const s=stalls[id]; if(!s) continue;
+    const cur=s.labelOrient;
+    if(!cur) s.labelOrient='h';
+    else if(cur==='h') s.labelOrient='v';
+    else delete s.labelOrient;
+    changed++;
+  }
+  if(changed){ saveAll(); pushHistory(); buildSVG(); flashStatus(`Повёрнуто: ${changed}`); }
 }
 
 function toggleLabelOrient(bid){
