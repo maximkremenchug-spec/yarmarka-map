@@ -2281,6 +2281,7 @@ function saveStall(){
   stalls[selectedId]=s;
   saveAll(); pushHistory();
   buildSVG(); updateStats();
+  if(editMode) renderEditPanel();
   flashSave();
 }
 
@@ -2866,6 +2867,14 @@ function renderEditPanel(){
     const pts=parsePath(b.path);
     const inside=Object.values(stalls).filter(s=>s.building===b.id && pointInPolygon(s.x+s.w/2, s.y+s.h/2, pts)).length;
     const orphans = cnt - inside;
+    // суммы аренды и площади со всех прилавков корпуса
+    let totalRent=0, totalArea=0;
+    for(const s of Object.values(stalls)){
+      if(s.building!==b.id) continue;
+      const r=parseFloat(String(s.rent||'').replace(/\s/g,'').replace(',','.')); if(!isNaN(r)) totalRent+=r;
+      const a=parseFloat(String(s.area||'').replace(/\s/g,'').replace(',','.')); if(!isNaN(a)) totalArea+=a;
+    }
+    const fmtN = (n,d=0)=> n.toLocaleString('ru-RU',{minimumFractionDigits:d, maximumFractionDigits:d});
     wrap.innerHTML=`
       <div class="ep-bld-head">
         <span>${b.id} — ${(b.label.split('—')[1]||b.label).trim()}</span>
@@ -2874,6 +2883,11 @@ function renderEditPanel(){
       <div class="ep-bld-body">
         <div class="ep-section">Площадь корпуса</div>
         <input class="inp" type="number" min="0" step="1" value="${b.area||0}" data-bid="${b.id}" data-field="area" placeholder="напр. 1200, м²">
+        <div class="ep-section">Итого по павильонам</div>
+        <div class="ep-row">
+          <div class="ep-col" style="flex:1"><label>Общая аренда, ₽</label><input type="text" value="${fmtN(totalRent,0)}" readonly style="opacity:.8;font-weight:600"></div>
+          <div class="ep-col" style="flex:1"><label>Общая площадь, м²</label><input type="text" value="${fmtN(totalArea,2)}" readonly style="opacity:.8;font-weight:600"></div>
+        </div>
         ${orphans>0?`<button class="btn btn-danger" style="width:100%;margin-top:8px" onclick="cleanupOrphans('${b.id}')">🧹 Прилавков вне контура: ${orphans} — пере-привязать по геометрии</button>`:''}
         <div class="ep-section">Цвет подложки</div>
         <div class="ep-row" style="align-items:center;gap:8px">
