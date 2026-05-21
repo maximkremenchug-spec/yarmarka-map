@@ -1007,9 +1007,9 @@ function renderBuilding(svg, b){
     let minY=pts[0][1], maxX=pts[0][0];
     for(const p of pts){if(p[0]>maxX)maxX=p[0]; if(p[1]<minY)minY=p[1];}
     svg.appendChild(el('text',{
-      x:maxX+6, y:minY-3,
+      x:maxX, y:minY-4,
       'font-size':13,'font-weight':800,fill:'#e94560',
-      'font-family':'sans-serif','pointer-events':'none','text-anchor':'start',
+      'font-family':'sans-serif','pointer-events':'none','text-anchor':'end',
     }, b.id));
   }
 }
