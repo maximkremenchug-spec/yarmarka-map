@@ -965,9 +965,6 @@ function buildSVG(){
   // название этажа — большим шрифтом над всем планом
   svg.appendChild(el('text',{x:400,y:40,'text-anchor':'middle','font-size':22,'font-weight':800,class:'sv-watermark','font-family':'sans-serif','pointer-events':'none','letter-spacing':2},floors[currentFloorIdx].name.toUpperCase()));
 
-  // компас — снаружи карты (правый верхний угол поля SVG)
-  drawCompass(svg, 745, 50);
-
   // контур участка (под зданиями)
   renderSite(svg);
 
