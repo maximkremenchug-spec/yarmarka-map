@@ -2645,18 +2645,65 @@ function openFromContent(jsonText, filename){
   updateStats();
   setTimeout(centerView, 50);
 }
-// API для PDF-экспорта из Electron main: переключаем pdf-mode на body
+// API для PDF-экспорта из Electron main: физически переставляем SVG в body,
+// прячем остальной DOM, ставим белый фон. После — возвращаем как было.
+let _pdfRestore=null;
 function enterPdfMode(){
-  document.body.classList.add('pdf-mode');
-  // снимаем зум + панорамирование, чтобы Chromium отрендерил SVG целиком
+  if(_pdfRestore) return true;
+  const svg=document.getElementById('ymap');
+  if(!svg){ console.warn('enterPdfMode: SVG не найден'); return false; }
   const sizer=document.getElementById('svg-sizer');
-  if(sizer){ sizer.dataset.prevTransform=sizer.style.transform||''; sizer.style.transform='none'; }
+  // запоминаем место и стили
+  _pdfRestore={
+    svgParent: svg.parentNode,
+    svgNext: svg.nextSibling,
+    svgStyle: svg.getAttribute('style')||'',
+    svgClass: svg.className && svg.className.baseVal!==undefined ? svg.className.baseVal : (svg.getAttribute('class')||''),
+    bodyStyle: document.body.getAttribute('style')||'',
+    bodyClass: document.body.className,
+    htmlStyle: document.documentElement.getAttribute('style')||'',
+    sizerTransform: sizer ? sizer.style.transform : null,
+    hidden: [],
+  };
+  // снимаем зум-трансформ
+  if(sizer) sizer.style.transform='none';
+  // прячем всё в body
+  for(const ch of Array.from(document.body.children)){
+    _pdfRestore.hidden.push([ch, ch.style.display||'']);
+    ch.style.display='none';
+  }
+  // перемещаем SVG напрямую в body и раскрываем его на весь лист
+  document.body.appendChild(svg);
+  svg.setAttribute('style','position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;background:#fff!important;filter:none!important;display:block!important;margin:0!important;padding:0!important;transform:none!important;');
+  // viewBox остаётся 0 0 800 950, preserveAspectRatio по умолчанию meet
+  if(!svg.getAttribute('preserveAspectRatio')) svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+  document.body.setAttribute('style','margin:0!important;padding:0!important;background:#fff!important;overflow:hidden!important;');
+  document.documentElement.setAttribute('style','margin:0!important;padding:0!important;background:#fff!important;');
+  document.body.classList.add('pdf-mode');
   return true;
 }
 function exitPdfMode(){
-  document.body.classList.remove('pdf-mode');
+  if(!_pdfRestore) return true;
+  const r=_pdfRestore;
+  const svg=document.getElementById('ymap');
+  if(svg){
+    svg.setAttribute('style', r.svgStyle);
+    if(r.svgParent){
+      if(r.svgNext) r.svgParent.insertBefore(svg, r.svgNext);
+      else r.svgParent.appendChild(svg);
+    }
+  }
+  // показываем обратно
+  for(const [el, prev] of r.hidden){ el.style.display=prev; }
   const sizer=document.getElementById('svg-sizer');
-  if(sizer && sizer.dataset.prevTransform!==undefined){ sizer.style.transform=sizer.dataset.prevTransform; delete sizer.dataset.prevTransform; }
+  if(sizer && r.sizerTransform!==null) sizer.style.transform=r.sizerTransform;
+  document.body.setAttribute('style', r.bodyStyle);
+  document.body.className = r.bodyClass;
+  document.documentElement.setAttribute('style', r.htmlStyle);
+  document.body.classList.remove('pdf-mode');
+  _pdfRestore=null;
+  // форсим перерисовку
+  if(typeof buildSVG==='function') try{ buildSVG(); }catch(e){}
   return true;
 }
 function getPlanTitleForFile(){
