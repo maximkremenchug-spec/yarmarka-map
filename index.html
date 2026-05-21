@@ -283,7 +283,7 @@
     <button class="tool-btn" data-tool="passage" onclick="setTool('passage')" title="Зона: drag-прямоугольник, спросит тип"><span>🟦</span><span class="lbl">Зона</span></button>
     <button class="tool-btn" data-tool="flow" onclick="setTool('flow')" title="Пешеходный поток"><span>👥</span><span class="lbl">Поток</span></button>
     <button class="tool-btn" data-tool="vertex" onclick="setTool('vertex')" title="Контуры зданий и участка"><span>⬡</span><span class="lbl">Контур</span></button>
-    <button class="tool-btn" data-tool="site" onclick="setTool('site')" title="Контур участка — кликай вершины, Enter завершит"><span>🗺</span><span class="lbl">Участок</span></button>
+    <button class="tool-btn" data-tool="site" onclick="onSiteToolClick()" title="Контур участка — кликай вершины, Enter завершит"><span>🗺</span><span class="lbl">Участок</span></button>
     <button class="tool-btn" onclick="cycleLShape()" title="Сделать выделенные прилавки угловыми (L-формы) / цикл угла / убрать"><span>⌐</span><span class="lbl">Угловой</span></button>
     <button class="tool-btn" onclick="cyclePShape()" title="Сделать выделенные прилавки П-образными / цикл стороны выреза / убрать"><span>∏</span><span class="lbl">П-форма</span></button>
     <button class="tool-btn" onclick="cycleStallLabelOrient()" title="Повернуть номер в выделенных прилавках (горизонтально / снизу-вверх / сброс к настройке здания)"><span>↻</span><span class="lbl">№ угол</span></button>
@@ -1126,35 +1126,8 @@ function renderSite(svg){
     stroke:'#6a8eb0','stroke-width':1.6,
     'stroke-dasharray':'8,5','pointer-events':'none',
   }));
-  if(site.label || editMode){
-    const lx=(site.labelXY&&site.labelXY[0])||pts[0][0]+10;
-    const ly=(site.labelXY&&site.labelXY[1])||pts[0][1]+22;
-    if(site.label){
-      svg.appendChild(el('text',{
-        x:lx, y:ly,
-        'font-size':18,'font-weight':700,fill:'#9ec3e8',
-        'font-family':'sans-serif',
-        'data-kind':'site-label',
-        style: editMode?'cursor:text':'cursor:default',
-      },site.label));
-    }
-    // ✕ удалить контур участка — только в режиме редактирования
-    if(editMode){
-      const labelW=(site.label||'').length*9+8;
-      const bx=lx+labelW, by=ly-12;
-      svg.appendChild(el('circle',{
-        cx:bx+8, cy:by+8, r:9,
-        fill:'#e74c3c', stroke:'#000','stroke-width':0.6,
-        style:'cursor:pointer',
-        'data-kind':'site-delete',
-      }));
-      svg.appendChild(el('text',{
-        x:bx+8, y:by+11,
-        'text-anchor':'middle','font-size':12,'font-weight':700,
-        fill:'#fff','font-family':'sans-serif','pointer-events':'none',
-      },'✕'));
-    }
-  }
+  // подпись и кнопка удаления больше не рисуются на карте
+  // для управления контуром — инструмент 🗺 Участок (он спросит при существующем)
   // ручки вершин в режиме «Контур»
   if(editMode && currentTool==='vertex'){
     pts.forEach((p,i)=>{
@@ -2072,6 +2045,19 @@ function editSiteLabel(){
     f.site.label=v.trim();
     saveAll(); pushHistory(); buildSVG();
   });
+}
+
+function onSiteToolClick(){
+  const f=floors[currentFloorIdx];
+  if(f && f.site){
+    // спрашиваем что делать с существующим контуром
+    const choice = prompt('Контур участка уже задан. Что сделать?\n\n1 — Перерисовать с нуля\n2 — Удалить\n3 — Изменить подпись\n(Enter / пусто = отмена)','');
+    if(choice==='1'){ f.site=null; saveAll(); pushHistory(); buildSVG(); setTool('site'); }
+    else if(choice==='2'){ f.site=null; saveAll(); pushHistory(); buildSVG(); flashStatus('Контур участка удалён'); }
+    else if(choice==='3'){ editSiteLabel(); }
+    return;
+  }
+  setTool('site');
 }
 
 function clearSite(){
