@@ -980,9 +980,6 @@ function buildSVG(){
   // единая подложка под всем планом
   svg.appendChild(el('rect',{width:800,height:950,class:'sv-bg-plot'}));
 
-  // название этажа — большим шрифтом над всем планом
-  svg.appendChild(el('text',{x:400,y:40,'text-anchor':'middle','font-size':22,'font-weight':800,class:'sv-watermark','font-family':'sans-serif','pointer-events':'none','letter-spacing':2},floors[currentFloorIdx].name.toUpperCase()));
-
   // контур участка (под зданиями)
   renderSite(svg);
 
@@ -1016,17 +1013,6 @@ function buildSVG(){
 
 function renderBuilding(svg, b){
   svg.appendChild(el('path',{id:`bld-${b.id}`,d:b.path,class:'building-outline','pointer-events':'none'}));
-  // Подпись — ID корпуса в правом верхнем углу СНАРУЖИ контура
-  const pts=parsePath(b.path);
-  if(pts.length){
-    let minY=pts[0][1], maxX=pts[0][0];
-    for(const p of pts){if(p[0]>maxX)maxX=p[0]; if(p[1]<minY)minY=p[1];}
-    svg.appendChild(el('text',{
-      x:maxX, y:minY-4,
-      'font-size':13,'font-weight':800,fill:'#e94560',
-      'font-family':'sans-serif','pointer-events':'none','text-anchor':'end',
-    }, b.id));
-  }
 }
 
 // П-форма: прямоугольник с прямоугольным вырезом на одной из 4-х сторон (по центру)
