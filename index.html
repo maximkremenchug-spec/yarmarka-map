@@ -85,8 +85,8 @@
   .main{flex:1;display:flex;overflow:hidden;position:relative}
   .map-wrap{flex:1;overflow:auto;background:var(--bg-road);display:flex;align-items:safe center;justify-content:safe center}
   .pan-area{padding:500px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .svg-sizer{position:relative;width:800px;height:950px;flex-shrink:0}
-  svg.ymap{position:absolute;top:0;left:0;width:800px;height:950px;transform-origin:0 0}
+  .svg-sizer{position:relative;width:960px;height:1090px;flex-shrink:0}
+  svg.ymap{position:absolute;top:0;left:0;width:960px;height:1090px;transform-origin:0 0}
   svg.ymap{display:block;filter:drop-shadow(0 6px 30px rgba(0,0,0,.6));user-select:none}
 
   .building-outline{fill:var(--bld-bg);stroke:#e94560;stroke-width:2.5;stroke-linejoin:round}
@@ -288,7 +288,7 @@
   <div class="map-wrap">
     <div class="pan-area">
       <div class="svg-sizer" id="svg-sizer">
-        <svg class="ymap" id="ymap" viewBox="0 0 800 950" xmlns="http://www.w3.org/2000/svg"></svg>
+        <svg class="ymap" id="ymap" viewBox="-80 -60 960 1090" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
     </div>
   </div>
@@ -901,7 +901,7 @@ function recalcFitScale(){
   const padW=40, padH=40;
   const aw=Math.max(50, wrap.clientWidth - padW);
   const ah=Math.max(50, wrap.clientHeight - padH);
-  fitScale = Math.min(aw/800, ah/950);
+  fitScale = Math.min(aw/960, ah/1090);
   if(!isFinite(fitScale) || fitScale<=0) fitScale=1;
   return fitScale;
 }
@@ -911,8 +911,8 @@ function applyZoom(pivot){
   const svg=document.getElementById('ymap');
   if(!wrap||!sizer||!svg) return;
   const eff = zoom*fitScale; // эффективный CSS-масштаб
-  sizer.style.width  = (800*eff)+'px';
-  sizer.style.height = (950*eff)+'px';
+  sizer.style.width  = (960*eff)+'px';
+  sizer.style.height = (1090*eff)+'px';
   svg.style.transform = `scale(${eff})`;
   const lbl=document.getElementById('zoom-pct');
   if(lbl) lbl.textContent=Math.round(zoom*100)+'%';
@@ -988,7 +988,7 @@ function buildSVG(){
   svg.innerHTML='';
 
   // единая подложка под всем планом
-  svg.appendChild(el('rect',{width:800,height:950,class:'sv-bg-plot'}));
+  svg.appendChild(el('rect',{x:-80,y:-60,width:960,height:1090,class:'sv-bg-plot'}));
 
   // контур участка (под зданиями)
   renderSite(svg);
