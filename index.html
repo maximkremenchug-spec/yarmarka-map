@@ -1216,12 +1216,12 @@ function renderStall(svg, id, s){
   const fsH_byH = (s.h - PAD*2) * 0.95;
   const fsH_byW = (s.w - PAD*2) / (chars * CHAR_W);
   const fsH = Math.min(fsH_byH, fsH_byW);
-  // вертикально: ширина ограничена s.h (стал шириной), высота ограничена s.w
+  // вертикально: стороны меняются местами
   const fsV_byH = (s.w - PAD*2) * 0.95;
   const fsV_byW = (s.h - PAD*2) / (chars * CHAR_W);
   const fsV = Math.min(fsV_byH, fsV_byW);
-  // предпочитаем горизонталь; вертикаль только если даёт ощутимо крупнее
-  const labelV = fsV > fsH * 1.3;
+  // горизонталь всегда, вертикаль только если горизонталь совсем нечитаемая (< 3px)
+  const labelV = fsH < 3 && fsV >= 3;
   const fs = Math.max(2.5, Math.min(9, labelV ? fsV : fsH));
   if((s.h - PAD*2) >= 2.5 && (s.w - PAD*2) >= 2.5){
     const cx=s.x+s.w/2, cy=s.y+s.h/2+1;
