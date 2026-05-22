@@ -1210,43 +1210,49 @@ function renderStall(svg, id, s){
   const b=BUILDINGS.find(x=>x.id===s.building);
   const num=id.split('-').pop();
   const chars=Math.max(1, num.length);
-  const PAD=0.6;
-  const CHAR_W=0.58;
-  // горизонтально: ширина ограничена s.w, высота ограничена s.h
-  const fsH_byH = (s.h - PAD*2) * 0.95;
-  const fsH_byW = (s.w - PAD*2) / (chars * CHAR_W);
-  const fsH = Math.min(fsH_byH, fsH_byW);
-  // вертикально: стороны меняются местами
-  const fsV_byH = (s.w - PAD*2) * 0.95;
-  const fsV_byW = (s.h - PAD*2) / (chars * CHAR_W);
-  const fsV = Math.min(fsV_byH, fsV_byW);
-  // горизонталь всегда, вертикаль только если горизонталь совсем нечитаемая (< 3px)
+  const PAD=1.5;
+  const CHAR_W=0.65; // консервативно: цифры sans-serif ~0.65 от fontSize
+
+  // для L-образных прилавков центр текста = центр основной полосы (не bounding box)
+  let textW=s.w, textH=s.h; // зона для размещения текста
+  let cx=s.x+s.w/2, cy=s.y+s.h/2;
+  if(isL && s.cut){
+    const cw=Math.min(Math.max(2,s.cut.cw|0),s.w-2);
+    const ch=Math.min(Math.max(2,s.cut.ch|0),s.h-2);
+    const corner=s.cut.corner||'tr';
+    // берём наибольшую прямоугольную полосу внутри L
+    if(corner==='tr'){ textW=s.w-cw; textH=s.h; cx=s.x+textW/2;        cy=s.y+s.h/2; }
+    if(corner==='tl'){ textW=s.w-cw; textH=s.h; cx=s.x+cw+textW/2;    cy=s.y+s.h/2; }
+    if(corner==='br'){ textW=s.w;    textH=s.h-ch; cx=s.x+s.w/2;       cy=s.y+textH/2; }
+    if(corner==='bl'){ textW=s.w;    textH=s.h-ch; cx=s.x+s.w/2;       cy=s.y+textH/2; }
+  }
+
+  const fsH = Math.min((textH-PAD*2)*0.92, (textW-PAD*2)/(chars*CHAR_W));
+  const fsV = Math.min((textW-PAD*2)*0.92, (textH-PAD*2)/(chars*CHAR_W));
+  // горизонталь всегда; вертикаль только если горизонталь нечитаема (< 3px)
   const labelV = fsH < 3 && fsV >= 3;
   const fs = Math.max(2.5, Math.min(9, labelV ? fsV : fsH));
-  if((s.h - PAD*2) >= 2.5 && (s.w - PAD*2) >= 2.5){
-    // для L-образных прилавков центр текста = центр большего прямоугольника внутри L
-    let cx=s.x+s.w/2, cy=s.y+s.h/2;
-    if(isL && s.cut){
-      const cw=Math.min(Math.max(2,s.cut.cw|0),s.w-2);
-      const ch=Math.min(Math.max(2,s.cut.ch|0),s.h-2);
-      const corner=s.cut.corner||'tr';
-      // два прямоугольника L: горизонтальный пояс и вертикальный
-      // выбираем тот, где больше площадь
-      const aH=(s.w)*(s.h-ch), aV=(s.w-cw)*(s.h); // упрощение: берём полные полосы
-      if(corner==='tr'){ cx=s.x+(s.w-cw)/2; cy=s.y+s.h/2; }       // левая полоса
-      if(corner==='tl'){ cx=s.x+cw+(s.w-cw)/2; cy=s.y+s.h/2; }    // правая полоса
-      if(corner==='br'){ cx=s.x+s.w/2; cy=s.y+(s.h-ch)/2; }       // верхняя полоса
-      if(corner==='bl'){ cx=s.x+s.w/2; cy=s.y+(s.h-ch)/2; }       // верхняя полоса
+
+  if((textH-PAD*2) >= 2.5 && (textW-PAD*2) >= 2.5){
+    // текст добавляем прямо в svg (не в повёрнутую группу), чтобы он всегда был прямым
+    // пересчитываем экранные координаты центра с учётом вращения прилавка
+    let tx=cx, ty=cy;
+    if(rot){
+      const gx=s.x+s.w/2, gy=s.y+s.h/2;
+      const a=rot*Math.PI/180;
+      const dx=cx-gx, dy=cy-gy;
+      tx=gx+dx*Math.cos(a)-dy*Math.sin(a);
+      ty=gy+dx*Math.sin(a)+dy*Math.cos(a);
     }
     const tAttrs={
-      x:cx,y:cy,
+      x:tx,y:ty,
       'text-anchor':'middle','dominant-baseline':'central',
       'font-size':fs.toFixed(2),
       fill:imp?'rgba(255,255,255,.78)':'rgba(100,160,220,.5)',
       'pointer-events':'none','font-family':'sans-serif',
     };
-    if(labelV) tAttrs.transform=`rotate(-90 ${cx} ${cy})`;
-    g.appendChild(el('text',tAttrs,num));
+    if(labelV) tAttrs.transform=`rotate(-90 ${tx} ${ty})`;
+    svg.appendChild(el('text',tAttrs,num)); // всегда в корневой svg, не в g
   }
   if(rot) svg.appendChild(g);
 }
