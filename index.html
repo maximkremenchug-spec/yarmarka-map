@@ -1224,7 +1224,20 @@ function renderStall(svg, id, s){
   const labelV = fsH < 3 && fsV >= 3;
   const fs = Math.max(2.5, Math.min(9, labelV ? fsV : fsH));
   if((s.h - PAD*2) >= 2.5 && (s.w - PAD*2) >= 2.5){
-    const cx=s.x+s.w/2, cy=s.y+s.h/2+1;
+    // для L-образных прилавков центр текста = центр большего прямоугольника внутри L
+    let cx=s.x+s.w/2, cy=s.y+s.h/2;
+    if(isL && s.cut){
+      const cw=Math.min(Math.max(2,s.cut.cw|0),s.w-2);
+      const ch=Math.min(Math.max(2,s.cut.ch|0),s.h-2);
+      const corner=s.cut.corner||'tr';
+      // два прямоугольника L: горизонтальный пояс и вертикальный
+      // выбираем тот, где больше площадь
+      const aH=(s.w)*(s.h-ch), aV=(s.w-cw)*(s.h); // упрощение: берём полные полосы
+      if(corner==='tr'){ cx=s.x+(s.w-cw)/2; cy=s.y+s.h/2; }       // левая полоса
+      if(corner==='tl'){ cx=s.x+cw+(s.w-cw)/2; cy=s.y+s.h/2; }    // правая полоса
+      if(corner==='br'){ cx=s.x+s.w/2; cy=s.y+(s.h-ch)/2; }       // верхняя полоса
+      if(corner==='bl'){ cx=s.x+s.w/2; cy=s.y+(s.h-ch)/2; }       // верхняя полоса
+    }
     const tAttrs={
       x:cx,y:cy,
       'text-anchor':'middle','dominant-baseline':'central',
