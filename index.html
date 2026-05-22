@@ -1210,7 +1210,7 @@ function renderStall(svg, id, s){
   // ориентация номера внутри клетки: 'h' (по умолчанию) или 'v' (снизу вверх — поворот -90°)
   // у прилавка может быть свой s.labelOrient (перекрывает настройку здания)
   const b=BUILDINGS.find(x=>x.id===s.building);
-  const labelV = s.labelOrient ? (s.labelOrient==='v') : (b && b.labelOrient==='v');
+  const labelV = false;
   // считаем размер шрифта, который реально влезет с минимальным отступом
   const num=id.split('-').pop();
   const chars=Math.max(1, num.length);
