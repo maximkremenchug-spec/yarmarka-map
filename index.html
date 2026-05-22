@@ -1207,22 +1207,23 @@ function renderStall(svg, id, s){
     stallAttrs.x=s.x; stallAttrs.y=s.y; stallAttrs.width=s.w; stallAttrs.height=s.h; stallAttrs.rx=1.5;
     g.appendChild(el('rect',stallAttrs));
   }
-  // ориентация номера внутри клетки: 'h' (по умолчанию) или 'v' (снизу вверх — поворот -90°)
-  // у прилавка может быть свой s.labelOrient (перекрывает настройку здания)
   const b=BUILDINGS.find(x=>x.id===s.building);
-  const labelV = false;
-  // считаем размер шрифта, который реально влезет с минимальным отступом
   const num=id.split('-').pop();
   const chars=Math.max(1, num.length);
-  const PAD=0.6;                          // отступ от стенки в пикселях
-  const CHAR_W=0.58;                       // средняя ширина цифры в долях fontSize (sans-serif)
-  // при labelV высота-надпись = ширина клетки, ширина-надпись = высота клетки
-  const availH = (labelV ? s.w : s.h) - PAD*2;
-  const availW = (labelV ? s.h : s.w) - PAD*2;
-  const fsByH = availH * 0.95;             // высота буквы ≈ fontSize
-  const fsByW = availW / (chars * CHAR_W); // ширина строки = chars*fontSize*CHAR_W
-  const fs=Math.max(2.5, Math.min(9, Math.min(fsByH, fsByW)));
-  if(availH>=2.5 && availW>=2.5){
+  const PAD=0.6;
+  const CHAR_W=0.58;
+  // горизонтально: ширина ограничена s.w, высота ограничена s.h
+  const fsH_byH = (s.h - PAD*2) * 0.95;
+  const fsH_byW = (s.w - PAD*2) / (chars * CHAR_W);
+  const fsH = Math.min(fsH_byH, fsH_byW);
+  // вертикально: ширина ограничена s.h (стал шириной), высота ограничена s.w
+  const fsV_byH = (s.w - PAD*2) * 0.95;
+  const fsV_byW = (s.h - PAD*2) / (chars * CHAR_W);
+  const fsV = Math.min(fsV_byH, fsV_byW);
+  // предпочитаем горизонталь; вертикаль только если даёт ощутимо крупнее
+  const labelV = fsV > fsH * 1.3;
+  const fs = Math.max(2.5, Math.min(9, labelV ? fsV : fsH));
+  if((s.h - PAD*2) >= 2.5 && (s.w - PAD*2) >= 2.5){
     const cx=s.x+s.w/2, cy=s.y+s.h/2+1;
     const tAttrs={
       x:cx,y:cy,
