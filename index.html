@@ -3030,11 +3030,11 @@ Chart.defaults.color='#4a5568';
 const PAL=['#3498db','#2ecc71','#e74c3c','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4','#8bc34a','#ff5722','#607d8b','#795548','#ff9800'];
 
 // ── Сохранение PDF ──
-// В Electron: кнопка меняет title → main process перехватывает → printToPDF
+// В Electron: preload пробрасывает window.electronSavePDF → IPC → printToPDF
 // В браузере: fallback на window.print()
 function savePDF(){
-  if(navigator.userAgent.indexOf('Electron')!==-1){
-    document.title='__SAVE_PDF__';
+  if(typeof window.electronSavePDF==='function'){
+    window.electronSavePDF();
   } else {
     window.print();
   }
