@@ -1053,7 +1053,8 @@ function renderBuilding(svg, b){
       lx=maxX; ly=minY-4;
     }
     // приблизительный размер подписи
-    const W = (b.id||'').length * 8.5;   // ширина текста (font-size:13, weight:800)
+    const lblText = b.label || b.id;
+    const W = (lblText||'').length * 8.5;   // ширина текста (font-size:13, weight:800)
     const H = 14;
     // bbox метки: учитываем text-anchor:'end' — x — правый край
     const tryRect = (x,y)=>({x:x-W, y:y-H+2, w:W, h:H});
@@ -1076,7 +1077,7 @@ function renderBuilding(svg, b){
     };
     if(editMode){ labelAttrs.style='cursor:move'; }
     else { labelAttrs['pointer-events']='none'; }
-    svg.appendChild(el('text', labelAttrs, b.id));
+    svg.appendChild(el('text', labelAttrs, lblText));
   }
 }
 
