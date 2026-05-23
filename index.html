@@ -2110,6 +2110,13 @@ function onSvgContextMenu(e){
 
 function onSvgDblClick(e){
   if(!editMode) return;
+  // двойной клик по надписи корпуса — переименовать прямо на плане
+  if(e.target.dataset && e.target.dataset.kind==='bld-label'){
+    e.preventDefault();
+    dragState=null;
+    editBuildingLabel(e.target.dataset.bid);
+    return;
+  }
   // закончить рисование потока на двойном клике
   if(currentTool==='flow' && drawingFlow){
     e.preventDefault();
