@@ -2707,67 +2707,59 @@ function exportXLSX(){
 // Импорт данных арендаторов из Excel в существующие прилавки.
 // Ищет лист "Прилавки" с колонками: Этаж, ID, ..., Арендатор, Категория, Важность, Аренда план, Аренда факт, Площадь м², Кол-во прилавков, Заметки
 // Совпадение по ID (опционально по имени этажа).
+// Колонки экспорта (точные имена — как в buildXLSXWorkbook лист «Прилавки»)
+// 'Этаж','ID','Корпус','Арендатор','Категория','Важность','Аренда план','Аренда факт','Площадь м²','Кол-во прилавков','Заметки'
 async function importXLSXFromArrayBuffer(buf){
   if(typeof XLSX==='undefined'){ alert('Библиотека Excel не загрузилась.'); return; }
   let wb;
   try{ wb=XLSX.read(buf, {type:'array'}); }
   catch(err){ alert('Не удалось прочитать файл: '+err.message); return; }
-  // ищем подходящий лист
-  let sheetName=wb.SheetNames.find(n=>/прилавк|stall|sheet1/i.test(n)) || wb.SheetNames[0];
-  const ws=wb.Sheets[sheetName];
+
+  // ищем лист «Прилавки», иначе первый
+  const sheetName = wb.SheetNames.find(n=>n==='Прилавки') || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
   if(!ws){ alert('В файле нет данных.'); return; }
-  const rows=XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+
+  const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
   if(!rows.length){ alert('Лист пустой.'); return; }
-  // нормализация ключей: убираем регистр и пробелы
-  const norm = s => String(s||'').toLowerCase().replace(/[^a-zа-я0-9]/gi,'');
-  const keymap = {};
-  Object.keys(rows[0]).forEach(k=>{ keymap[norm(k)]=k; });
-  const getCol = (...names)=>{ for(const n of names){ const k=keymap[norm(n)]; if(k) return k; } return null; };
-  const colId       = getCol('ID','id','№','номер');
-  const colFloor    = getCol('Этаж','floor');
-  const colTenant   = getCol('Арендатор','tenant','компания','фирма','название');
-  const colCategory = getCol('Категория','category','категориятовара');
-  const colImp      = getCol('Важность','importance');
-  const colRent     = getCol('Арендаплан','rent','аренда','планаренды','аренда₽мес');
-  const colRentF    = getCol('Арендафакт','rentfact','фактаренды','факт');
-  const colArea     = getCol('Площадьм2','площадь','area','площадьпавильона');
-  const colCounters = getCol('Колвоприлавков','прилавки','counters','количествоприлавков');
-  const colNotes    = getCol('Заметки','notes','примечания','комментарии');
-  if(!colId){ alert('Не нашёл колонку с ID прилавка. Ожидался столбец «ID».'); return; }
+
+  // проверяем обязательный столбец
+  if(!('ID' in rows[0])){ alert('Не найден столбец «ID».\nОжидаемые колонки: Этаж, ID, Корпус, Арендатор, Категория, Важность, Аренда план, Аренда факт, Площадь м², Кол-во прилавков, Заметки'); return; }
+
   let updated=0, missing=[];
   for(const row of rows){
-    const id=String(row[colId]||'').trim();
+    const id = String(row['ID']||'').trim();
     if(!id) continue;
-    // выбор этажа: если указан и совпадает — используем его; иначе текущий
-    let targetStalls=stalls;
-    let targetFloor=floors[currentFloorIdx];
-    if(colFloor){
-      const fname=String(row[colFloor]||'').trim();
-      if(fname){
-        const f=floors.find(fl=>fl.name===fname);
-        if(f){ targetFloor=f; targetStalls=f.stalls; }
-      }
+
+    // выбор этажа по колонке «Этаж», иначе текущий
+    let targetStalls = stalls;
+    const floorName = String(row['Этаж']||'').trim();
+    if(floorName){
+      const f = floors.find(fl=>fl.name===floorName);
+      if(f) targetStalls = f.stalls;
     }
-    const s=targetStalls[id];
+
+    const s = targetStalls[id];
     if(!s){ missing.push(id); continue; }
-    if(colTenant)   s.tenant   = String(row[colTenant]||'').trim();
-    if(colCategory) s.category = String(row[colCategory]||'').trim();
-    if(colImp){
-      const v=String(row[colImp]||'').trim().toUpperCase();
-      if(['A','B','C','D'].includes(v)) s.importance=v;
-      else if(!v) s.importance='';
+
+    if('Арендатор'     in row) s.tenant   = String(row['Арендатор']||'').trim();
+    if('Категория'     in row) s.category = String(row['Категория']||'').trim();
+    if('Важность'      in row){
+      const v = String(row['Важность']||'').trim().toUpperCase();
+      s.importance = ['A','B','C','D'].includes(v) ? v : '';
     }
-    if(colRent)     s.rent     = String(row[colRent]||'').replace(/[^\d.]/g,'');
-    if(colRentF)    s.rentFact = String(row[colRentF]||'').replace(/[^\d.]/g,'');
-    if(colArea)     s.area     = String(row[colArea]||'').replace(/[^\d.]/g,'');
-    if(colCounters) s.counters = String(row[colCounters]||'').replace(/[^\d]/g,'');
-    if(colNotes)    s.notes    = String(row[colNotes]||'').trim();
+    if('Аренда план'   in row) s.rent     = String(row['Аренда план']||'').replace(/[^\d.]/g,'');
+    if('Аренда факт'   in row) s.rentFact = String(row['Аренда факт']||'').replace(/[^\d.]/g,'');
+    if('Площадь м²'    in row) s.area     = String(row['Площадь м²']||'').replace(/[^\d.]/g,'');
+    if('Кол-во прилавков' in row) s.counters = String(row['Кол-во прилавков']||'').replace(/[^\d]/g,'');
+    if('Заметки'       in row) s.notes    = String(row['Заметки']||'').trim();
     updated++;
   }
+
   saveAll(); pushHistory(); buildSVG(); updateStats();
   if(selectedId && stalls[selectedId]) openStall(selectedId);
-  let msg=`✅ Обновлено прилавков: ${updated} из ${rows.length}`;
-  if(missing.length) msg+=`\n\n⚠️ Не найдено по ID (${missing.length}): ${missing.slice(0,20).join(', ')}${missing.length>20?'…':''}`;
+  let msg = `✅ Обновлено прилавков: ${updated} из ${rows.length}`;
+  if(missing.length) msg += `\n\n⚠️ Не найдено по ID (${missing.length}): ${missing.slice(0,20).join(', ')}${missing.length>20?'…':''}`;
   alert(msg);
 }
 
