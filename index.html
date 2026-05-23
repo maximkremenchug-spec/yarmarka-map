@@ -2686,6 +2686,88 @@ function exportXLSX(){
   XLSX.writeFile(wb, `yarmarka-audit-${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
+// Импорт данных арендаторов из Excel в существующие прилавки.
+// Ищет лист "Прилавки" с колонками: Этаж, ID, ..., Арендатор, Категория, Важность, Аренда план, Аренда факт, Площадь м², Кол-во прилавков, Заметки
+// Совпадение по ID (опционально по имени этажа).
+async function importXLSXFromArrayBuffer(buf){
+  if(typeof XLSX==='undefined'){ alert('Библиотека Excel не загрузилась.'); return; }
+  let wb;
+  try{ wb=XLSX.read(buf, {type:'array'}); }
+  catch(err){ alert('Не удалось прочитать файл: '+err.message); return; }
+  // ищем подходящий лист
+  let sheetName=wb.SheetNames.find(n=>/прилавк|stall|sheet1/i.test(n)) || wb.SheetNames[0];
+  const ws=wb.Sheets[sheetName];
+  if(!ws){ alert('В файле нет данных.'); return; }
+  const rows=XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+  if(!rows.length){ alert('Лист пустой.'); return; }
+  // нормализация ключей: убираем регистр и пробелы
+  const norm = s => String(s||'').toLowerCase().replace(/[^a-zа-я0-9]/gi,'');
+  const keymap = {};
+  Object.keys(rows[0]).forEach(k=>{ keymap[norm(k)]=k; });
+  const getCol = (...names)=>{ for(const n of names){ const k=keymap[norm(n)]; if(k) return k; } return null; };
+  const colId       = getCol('ID','id','№','номер');
+  const colFloor    = getCol('Этаж','floor');
+  const colTenant   = getCol('Арендатор','tenant','компания','фирма','название');
+  const colCategory = getCol('Категория','category','категориятовара');
+  const colImp      = getCol('Важность','importance');
+  const colRent     = getCol('Арендаплан','rent','аренда','планаренды','аренда₽мес');
+  const colRentF    = getCol('Арендафакт','rentfact','фактаренды','факт');
+  const colArea     = getCol('Площадьм2','площадь','area','площадьпавильона');
+  const colCounters = getCol('Колвоприлавков','прилавки','counters','количествоприлавков');
+  const colNotes    = getCol('Заметки','notes','примечания','комментарии');
+  if(!colId){ alert('Не нашёл колонку с ID прилавка. Ожидался столбец «ID».'); return; }
+  let updated=0, missing=[];
+  for(const row of rows){
+    const id=String(row[colId]||'').trim();
+    if(!id) continue;
+    // выбор этажа: если указан и совпадает — используем его; иначе текущий
+    let targetStalls=stalls;
+    let targetFloor=floors[currentFloorIdx];
+    if(colFloor){
+      const fname=String(row[colFloor]||'').trim();
+      if(fname){
+        const f=floors.find(fl=>fl.name===fname);
+        if(f){ targetFloor=f; targetStalls=f.stalls; }
+      }
+    }
+    const s=targetStalls[id];
+    if(!s){ missing.push(id); continue; }
+    if(colTenant)   s.tenant   = String(row[colTenant]||'').trim();
+    if(colCategory) s.category = String(row[colCategory]||'').trim();
+    if(colImp){
+      const v=String(row[colImp]||'').trim().toUpperCase();
+      if(['A','B','C','D'].includes(v)) s.importance=v;
+      else if(!v) s.importance='';
+    }
+    if(colRent)     s.rent     = String(row[colRent]||'').replace(/[^\d.]/g,'');
+    if(colRentF)    s.rentFact = String(row[colRentF]||'').replace(/[^\d.]/g,'');
+    if(colArea)     s.area     = String(row[colArea]||'').replace(/[^\d.]/g,'');
+    if(colCounters) s.counters = String(row[colCounters]||'').replace(/[^\d]/g,'');
+    if(colNotes)    s.notes    = String(row[colNotes]||'').trim();
+    updated++;
+  }
+  saveAll(); pushHistory(); buildSVG(); updateStats();
+  if(selectedId && stalls[selectedId]) openStall(selectedId);
+  let msg=`✅ Обновлено прилавков: ${updated} из ${rows.length}`;
+  if(missing.length) msg+=`\n\n⚠️ Не найдено по ID (${missing.length}): ${missing.slice(0,20).join(', ')}${missing.length>20?'…':''}`;
+  alert(msg);
+}
+
+function importXLSX(){
+  const inp=document.createElement('input');
+  inp.type='file';
+  inp.accept='.xlsx,.xls,.csv';
+  inp.onchange=async ()=>{
+    const f=inp.files && inp.files[0];
+    if(!f) return;
+    const buf=await f.arrayBuffer();
+    importXLSXFromArrayBuffer(buf);
+  };
+  inp.click();
+}
+window.importXLSX = importXLSX;
+window.importXLSXFromArrayBuffer = importXLSXFromArrayBuffer;
+
 // ── Дропдаун "Файл" ──
 function toggleDropdown(btn){
   const dd=btn.closest('.dropdown');
