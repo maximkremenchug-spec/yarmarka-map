@@ -2813,301 +2813,388 @@ window.importXLSX = importXLSX;
 window.importXLSXFromArrayBuffer = importXLSXFromArrayBuffer;
 
 // ── Аналитический отчёт ──
-function generateReport(){
+function buildReportHTML(){
   const num = v => { const n = Number(v); return isNaN(n) ? 0 : n; };
 
   // ── Сбор данных ──
   const allStalls = [];
-  for(const fl of floors){
-    for(const [id, s] of Object.entries(fl.stalls)){
+  for(const fl of floors)
+    for(const [id, s] of Object.entries(fl.stalls))
       allStalls.push({...s, id, floorName: fl.name});
-    }
-  }
 
-  const total   = allStalls.length;
-  const occupied = allStalls.filter(s => s.tenant).length;
-  const empty   = total - occupied;
-  const totalRentPlan = allStalls.reduce((a,s) => a + num(s.rent),     0);
-  const totalRentFact = allStalls.reduce((a,s) => a + num(s.rentFact), 0);
-  const totalArea     = allStalls.reduce((a,s) => a + num(s.area),     0);
-  const totalCounters = allStalls.reduce((a,s) => a + num(s.counters), 0);
-  const fillPct = total ? Math.round(occupied/total*100) : 0;
-  const discountPct = totalRentPlan > 0 ? Math.round((1 - totalRentFact/totalRentPlan)*100*10)/10 : 0;
+  const total        = allStalls.length;
+  const occupied     = allStalls.filter(s => s.tenant).length;
+  const empty        = total - occupied;
+  const totalRentPlan= allStalls.reduce((a,s)=>a+num(s.rent),    0);
+  const totalRentFact= allStalls.reduce((a,s)=>a+num(s.rentFact),0);
+  const totalArea    = allStalls.reduce((a,s)=>a+num(s.area),    0);
+  const totalCounters= allStalls.reduce((a,s)=>a+num(s.counters),0);
+  const fillPct      = total ? Math.round(occupied/total*100) : 0;
+  const discountPct  = totalRentPlan>0 ? Math.round((1-totalRentFact/totalRentPlan)*100*10)/10 : 0;
 
   // Важность
-  const impCount = {A:0, B:0, C:0, D:0, none:0};
+  const impCount = {A:0,B:0,C:0,D:0,none:0};
   for(const s of allStalls) impCount[s.importance||'none']++;
 
-  // Категории — по количеству павильонов
+  // Категории
   const catMap = {};
   for(const s of allStalls){
-    const cat = s.category || '(без категории)';
-    if(!catMap[cat]) catMap[cat] = {count:0, area:0, rent:0};
-    catMap[cat].count++; catMap[cat].area += num(s.area); catMap[cat].rent += num(s.rent);
+    const cat = s.category||'(без категории)';
+    if(!catMap[cat]) catMap[cat]={count:0,area:0,rent:0};
+    catMap[cat].count++; catMap[cat].area+=num(s.area); catMap[cat].rent+=num(s.rent);
   }
-  const catSorted = Object.entries(catMap).sort((a,b) => b[1].count - a[1].count);
+  const catSorted = Object.entries(catMap).sort((a,b)=>b[1].count-a[1].count);
 
   // По корпусам
   const bldMap = {};
-  for(const fl of floors){
+  for(const fl of floors)
     for(const s of Object.values(fl.stalls)){
-      const key = s.building || 'X';
-      if(!bldMap[key]) bldMap[key] = {count:0, filled:0, rentPlan:0, rentFact:0, area:0};
+      const key = s.building||'X';
+      if(!bldMap[key]) bldMap[key]={count:0,filled:0,rentPlan:0,rentFact:0,area:0,rents:[]};
       bldMap[key].count++;
-      if(s.tenant || s.importance) bldMap[key].filled++;
-      bldMap[key].rentPlan += num(s.rent);
-      bldMap[key].rentFact += num(s.rentFact);
-      bldMap[key].area     += num(s.area);
+      if(s.tenant||s.importance) bldMap[key].filled++;
+      bldMap[key].rentPlan+=num(s.rent);
+      bldMap[key].rentFact+=num(s.rentFact);
+      bldMap[key].area    +=num(s.area);
+      if(num(s.rent)>0) bldMap[key].rents.push({id:s.id||'', r:num(s.rent), t:s.tenant||''});
     }
-  }
   const bldKeys  = Object.keys(bldMap);
-  const bldPlans = bldKeys.map(k => bldMap[k].rentPlan);
-  const bldFacts = bldKeys.map(k => bldMap[k].rentFact);
-  const bldFilled= bldKeys.map(k => bldMap[k].filled);
-  const bldEmpt  = bldKeys.map(k => bldMap[k].count - bldMap[k].filled);
+  const bldPlans = bldKeys.map(k=>bldMap[k].rentPlan);
+  const bldFacts = bldKeys.map(k=>bldMap[k].rentFact);
+  const bldFilled= bldKeys.map(k=>bldMap[k].filled);
+  const bldEmpt  = bldKeys.map(k=>bldMap[k].count-bldMap[k].filled);
+
+  // Средняя ставка и отклонения по корпусам
+  const bldAvg={}, bldMin={}, bldMax={};
+  const bldAbove={}, bldBelow={}, bldAt={};
+  for(const k of bldKeys){
+    const rents = bldMap[k].rents.map(x=>x.r);
+    if(!rents.length){ bldAvg[k]=0; bldMin[k]=0; bldMax[k]=0; bldAbove[k]=0; bldBelow[k]=0; bldAt[k]=0; continue; }
+    const avg = rents.reduce((a,b)=>a+b,0)/rents.length;
+    bldAvg[k] = Math.round(avg);
+    bldMin[k] = Math.min(...rents);
+    bldMax[k] = Math.max(...rents);
+    bldAbove[k]= rents.filter(r=>r>avg*1.05).length;
+    bldBelow[k]= rents.filter(r=>r<avg*0.95).length;
+    bldAt[k]   = rents.length - bldAbove[k] - bldBelow[k];
+  }
+
+  // Топ арендаторов (по числу павильонов)
+  const tenantMap = {};
+  for(const s of allStalls){
+    if(!s.tenant) continue;
+    tenantMap[s.tenant]=(tenantMap[s.tenant]||0)+1;
+  }
+  const tenantTop = Object.entries(tenantMap).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  const hasMultiTenant = tenantTop.some(([,c])=>c>1);
 
   // По этажам
-  const floorData = floors.map(fl => {
-    const arr = Object.values(fl.stalls);
+  const floorData = floors.map(fl=>{
+    const arr=Object.values(fl.stalls);
     return {
-      name: fl.name,
-      total:    arr.length,
-      occupied: arr.filter(s=>s.tenant).length,
-      empty:    arr.filter(s=>!s.tenant).length,
-      rentPlan: arr.reduce((a,s)=>a+num(s.rent),0),
-      rentFact: arr.reduce((a,s)=>a+num(s.rentFact),0),
+      name:fl.name,
+      total:arr.length,
+      occupied:arr.filter(s=>s.tenant).length,
+      empty:arr.filter(s=>!s.tenant).length,
+      rentPlan:arr.reduce((a,s)=>a+num(s.rent),0),
+      rentFact:arr.reduce((a,s)=>a+num(s.rentFact),0),
     };
   });
 
-  const fmt = n => n.toLocaleString('ru-RU');
-  const hasFact = totalRentFact > 0;
-  const hasArea = totalArea > 0;
+  const fmt      = n => n.toLocaleString('ru-RU');
+  const hasFact  = totalRentFact>0;
+  const hasArea  = totalArea>0;
+  const hasRents = bldKeys.some(k=>bldMap[k].rents.length>0);
+  const hasTenants = tenantTop.length>0;
+  const nFloors  = floors.length;
+  const flLabel  = nFloors===1?'этаж':nFloors<5?'этажа':'этажей';
 
-  // ── Генерация HTML ──
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Отчёт по рынку — ${new Date().toLocaleDateString('ru-RU')}</title>
+<title>Отчёт — ${new Date().toLocaleDateString('ru-RU')}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#1a2538;font-size:13px}
-.page{max-width:1240px;margin:0 auto;padding:24px 20px}
+.page{max-width:1280px;margin:0 auto;padding:24px 20px}
 h1{font-size:22px;font-weight:800;color:#e94560;margin-bottom:3px}
-.subtitle{color:#6b7b8d;font-size:12px;margin-bottom:24px}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
-.kpi{background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-left:4px solid #3498db}
+.subtitle{color:#6b7b8d;font-size:12px;margin-bottom:20px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-left:4px solid #3498db}
 .kpi.g{border-color:#2ecc71}.kpi.r{border-color:#e74c3c}.kpi.o{border-color:#f39c12}.kpi.p{border-color:#9b59b6}.kpi.t{border-color:#1abc9c}
-.kpi-label{font-size:10px;color:#8a9ab5;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
-.kpi-val{font-size:28px;font-weight:800;color:#1a2538;line-height:1.1}
-.kpi-sub{font-size:11px;color:#8a9ab5;margin-top:4px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:18px}
-.grid1{margin-bottom:18px}
-.card{background:#fff;border-radius:10px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.07)}
-.card h2{font-size:13px;font-weight:700;color:#2c3e50;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #edf0f5}
+.kpi-label{font-size:10px;color:#8a9ab5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.kpi-val{font-size:26px;font-weight:800;color:#1a2538;line-height:1.1}
+.kpi-sub{font-size:11px;color:#8a9ab5;margin-top:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid1{margin-bottom:16px}
+.card{background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.card h2{font-size:12px;font-weight:700;color:#2c3e50;margin-bottom:12px;padding-bottom:7px;border-bottom:1px solid #edf0f5;text-transform:uppercase;letter-spacing:.4px}
 .chart-wrap{position:relative}
-.print-btn{float:right;padding:7px 18px;background:#3498db;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600}
-.print-btn:hover{background:#2980b9}
-@media print{body{background:#fff}.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}.print-btn{display:none}}
-@media(max-width:700px){.grid2,.grid3{grid-template-columns:1fr}}
+.btns{display:flex;gap:8px}
+.btn-pdf{padding:7px 16px;background:#e94560;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600}
+.btn-pdf:hover{background:#c73652}
+.btn-print{padding:7px 16px;background:#3498db;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600}
+.btn-print:hover{background:#2980b9}
+@page{size:A3 landscape;margin:1cm}
+@media print{
+  body{background:#fff}
+  .card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}
+  .btns{display:none}
+  .grid2{grid-template-columns:1fr 1fr}
+}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="page">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">
     <h1>📊 Аналитический отчёт</h1>
-    <button class="print-btn" onclick="window.print()">🖨 Печать / PDF</button>
+    <div class="btns">
+      <button class="btn-pdf" onclick="savePDF()">💾 Сохранить PDF</button>
+      <button class="btn-print" onclick="window.print()">🖨 Печать</button>
+    </div>
   </div>
-  <div class="subtitle">Сформирован ${new Date().toLocaleString('ru-RU')} · ${floors.length} ${floors.length===1?'этаж':floors.length<5?'этажа':'этажей'} · ${total} павильонов</div>
+  <div class="subtitle">Сформирован ${new Date().toLocaleString('ru-RU')} · ${nFloors} ${flLabel} · ${total} павильонов</div>
 
   <!-- KPI -->
   <div class="kpi-grid">
-    <div class="kpi">
-      <div class="kpi-label">Всего павильонов</div>
-      <div class="kpi-val">${total}</div>
-      <div class="kpi-sub">${floors.length} ${floors.length===1?'этаж':floors.length<5?'этажа':'этажей'}</div>
-    </div>
-    <div class="kpi g">
-      <div class="kpi-label">Занято</div>
-      <div class="kpi-val">${occupied}</div>
-      <div class="kpi-sub">${fillPct}% заполненность</div>
-    </div>
-    <div class="kpi r">
-      <div class="kpi-label">Свободно</div>
-      <div class="kpi-val">${empty}</div>
-      <div class="kpi-sub">${100-fillPct}% вакансия</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Аренда план ₽/мес</div>
-      <div class="kpi-val" style="font-size:20px">${fmt(totalRentPlan)}</div>
-      <div class="kpi-sub">со всех павильонов</div>
-    </div>
-    ${hasFact ? `<div class="kpi t">
-      <div class="kpi-label">Аренда факт ₽/мес</div>
-      <div class="kpi-val" style="font-size:20px">${fmt(totalRentFact)}</div>
-      <div class="kpi-sub">скидка: ${discountPct}%</div>
-    </div>` : ''}
-    ${hasArea ? `<div class="kpi p">
-      <div class="kpi-label">Торговая площадь</div>
-      <div class="kpi-val" style="font-size:20px">${fmt(Math.round(totalArea))}</div>
-      <div class="kpi-sub">м² суммарно</div>
-    </div>` : ''}
-    ${totalCounters > 0 ? `<div class="kpi o">
-      <div class="kpi-label">Прилавков всего</div>
-      <div class="kpi-val">${totalCounters}</div>
-      <div class="kpi-sub">по всему рынку</div>
-    </div>` : ''}
+    <div class="kpi"><div class="kpi-label">Всего павильонов</div><div class="kpi-val">${total}</div><div class="kpi-sub">${nFloors} ${flLabel}</div></div>
+    <div class="kpi g"><div class="kpi-label">Занято</div><div class="kpi-val">${occupied}</div><div class="kpi-sub">${fillPct}% заполненность</div></div>
+    <div class="kpi r"><div class="kpi-label">Свободно</div><div class="kpi-val">${empty}</div><div class="kpi-sub">${100-fillPct}% вакансия</div></div>
+    <div class="kpi"><div class="kpi-label">Аренда план ₽/мес</div><div class="kpi-val" style="font-size:19px">${fmt(totalRentPlan)}</div><div class="kpi-sub">со всех павильонов</div></div>
+    ${hasFact?`<div class="kpi t"><div class="kpi-label">Аренда факт ₽/мес</div><div class="kpi-val" style="font-size:19px">${fmt(totalRentFact)}</div><div class="kpi-sub">скидка: ${discountPct}%</div></div>`:''}
+    ${hasArea?`<div class="kpi p"><div class="kpi-label">Торговая площадь</div><div class="kpi-val" style="font-size:19px">${fmt(Math.round(totalArea))}</div><div class="kpi-sub">м² суммарно</div></div>`:''}
+    ${totalCounters>0?`<div class="kpi o"><div class="kpi-label">Прилавков всего</div><div class="kpi-val">${totalCounters}</div><div class="kpi-sub">по всему рынку</div></div>`:''}
+    ${hasRents?`<div class="kpi"><div class="kpi-label">Арендаторов уникальных</div><div class="kpi-val">${Object.keys(tenantMap).length}</div><div class="kpi-sub">арендуют ${occupied} пав.</div></div>`:''}
   </div>
 
   <!-- Занятость + Важность -->
   <div class="grid2">
-    <div class="card">
-      <h2>🏪 Занятость павильонов</h2>
-      <div class="chart-wrap" style="height:240px"><canvas id="cOcc"></canvas></div>
-    </div>
-    <div class="card">
-      <h2>⭐ Приоритет (важность) павильонов</h2>
-      <div class="chart-wrap" style="height:240px"><canvas id="cImp"></canvas></div>
-    </div>
+    <div class="card"><h2>🏪 Занятость павильонов</h2>
+      <div class="chart-wrap" style="height:230px"><canvas id="cOcc"></canvas></div></div>
+    <div class="card"><h2>⭐ Приоритет (важность)</h2>
+      <div class="chart-wrap" style="height:230px"><canvas id="cImp"></canvas></div></div>
   </div>
 
   <!-- Категории -->
-  <div class="grid1">
-    <div class="card">
-      <h2>🛒 Количество павильонов по категориям товаров</h2>
-      <div class="chart-wrap" style="height:${Math.max(200, catSorted.length * 30)}px"><canvas id="cCat"></canvas></div>
-    </div>
+  <div class="grid1"><div class="card"><h2>🛒 Павильоны по категориям товаров</h2>
+    <div class="chart-wrap" style="height:${Math.max(180, catSorted.length*28)}px"><canvas id="cCat"></canvas></div>
+  </div></div>
+
+  <!-- Топ арендаторов -->
+  ${hasTenants?`<div class="grid1"><div class="card"><h2>👤 Топ арендаторов по числу павильонов (% от всех)</h2>
+    <div class="chart-wrap" style="height:${Math.max(180, tenantTop.length*30)}px"><canvas id="cTen"></canvas></div>
+  </div></div>`:''}
+
+  <!-- Корпуса: заполненность + аренда -->
+  <div class="grid2">
+    <div class="card"><h2>🏢 Заполненность по корпусам</h2>
+      <div class="chart-wrap" style="height:250px"><canvas id="cFillBld"></canvas></div></div>
+    <div class="card"><h2>💰 Аренда план${hasFact?' vs факт':''} по корпусам (₽/мес)</h2>
+      <div class="chart-wrap" style="height:250px"><canvas id="cRentBld"></canvas></div></div>
   </div>
 
-  <!-- Корпуса -->
+  <!-- Средняя ставка + отклонения -->
+  ${hasRents?`
   <div class="grid2">
-    <div class="card">
-      <h2>🏢 Заполненность по корпусам</h2>
-      <div class="chart-wrap" style="height:260px"><canvas id="cFillBld"></canvas></div>
-    </div>
-    <div class="card">
-      <h2>💰 Аренда план${hasFact?' vs факт':''} по корпусам (₽/мес)</h2>
-      <div class="chart-wrap" style="height:260px"><canvas id="cRentBld"></canvas></div>
-    </div>
-  </div>
+    <div class="card"><h2>📈 Средняя арендная ставка по корпусу (₽/мес) — диапазон мин/макс</h2>
+      <div class="chart-wrap" style="height:260px"><canvas id="cAvgRent"></canvas></div></div>
+    <div class="card"><h2>📊 Отклонения от средней ставки — павильонов выше / в норме / ниже</h2>
+      <div class="chart-wrap" style="height:260px"><canvas id="cDev"></canvas></div></div>
+  </div>`:''}
 
-  ${hasArea ? `<!-- Площадь по категориям -->
-  <div class="grid1">
-    <div class="card">
-      <h2>📐 Торговая площадь по категориям (м²)</h2>
-      <div class="chart-wrap" style="height:${Math.max(200, catSorted.filter(([,v])=>v.area>0).length * 30)}px"><canvas id="cArea"></canvas></div>
-    </div>
-  </div>` : ''}
+  ${hasArea?`<div class="grid1"><div class="card"><h2>📐 Торговая площадь по категориям (м²)</h2>
+    <div class="chart-wrap" style="height:${Math.max(180,catSorted.filter(([,v])=>v.area>0).length*28)}px"><canvas id="cArea"></canvas></div>
+  </div></div>`:''}
 
-  ${floors.length > 1 ? `<!-- По этажам -->
-  <div class="grid2">
-    <div class="card">
-      <h2>🏗 Занятость по этажам</h2>
-      <div class="chart-wrap" style="height:240px"><canvas id="cFloors"></canvas></div>
-    </div>
-    <div class="card">
-      <h2>💰 Аренда план${hasFact?' vs факт':''} по этажам (₽/мес)</h2>
-      <div class="chart-wrap" style="height:240px"><canvas id="cRentFloor"></canvas></div>
-    </div>
-  </div>` : ''}
+  ${nFloors>1?`<div class="grid2">
+    <div class="card"><h2>🏗 Занятость по этажам</h2>
+      <div class="chart-wrap" style="height:230px"><canvas id="cFloors"></canvas></div></div>
+    <div class="card"><h2>💰 Аренда по этажам (₽/мес)</h2>
+      <div class="chart-wrap" style="height:230px"><canvas id="cRentFloor"></canvas></div></div>
+  </div>`:''}
 
-  ${hasFact ? `<!-- Скидки по корпусам -->
-  <div class="grid1">
-    <div class="card">
-      <h2>📉 Размер скидки по корпусам (%)</h2>
-      <div class="chart-wrap" style="height:220px"><canvas id="cDisc"></canvas></div>
-    </div>
-  </div>` : ''}
+  ${hasFact?`<div class="grid1"><div class="card"><h2>📉 Размер скидки по корпусам (%)</h2>
+    <div class="chart-wrap" style="height:200px"><canvas id="cDisc"></canvas></div>
+  </div></div>`:''}
 
 </div>
 <script>
 Chart.defaults.font.family="-apple-system,'Segoe UI',Arial,sans-serif";
-Chart.defaults.font.size=12;
+Chart.defaults.font.size=11;
 Chart.defaults.color='#4a5568';
+const PAL=['#3498db','#2ecc71','#e74c3c','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4','#8bc34a','#ff5722','#607d8b','#795548','#ff9800'];
 
-const PAL=['#3498db','#2ecc71','#e74c3c','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4','#8bc34a','#ff5722','#607d8b','#795548','#ff9800','#03a9f4','#4caf50','#f44336'];
+// ── Сохранение PDF (⌘S / Ctrl+S) ──
+function savePDF(){
+  document.title='Отчёт_${new Date().toISOString().slice(0,10)}';
+  window.print();
+}
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();savePDF();}});
 
 // 1. Занятость
 new Chart(document.getElementById('cOcc'),{type:'doughnut',data:{
-  labels:['Занято (есть арендатор)','Свободно'],
+  labels:['Занято','Свободно'],
   datasets:[{data:[${occupied},${empty}],backgroundColor:['#2ecc71','#e74c3c'],borderWidth:2,borderColor:'#fff'}]
-},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.label+': '+c.raw+' пав. ('+Math.round(c.raw/${Math.max(total,1)}*100)+'%)' }}}}});
+},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom'},
+  tooltip:{callbacks:{label:c=>c.label+': '+c.raw+' ('+Math.round(c.raw/${Math.max(total,1)}*100)+'%)'}}}}});
 
 // 2. Важность
 new Chart(document.getElementById('cImp'),{type:'doughnut',data:{
   labels:['A — VIP','B — Хорошие','C — Средние','D — Слабые','Не задан'],
-  datasets:[{data:[${impCount.A},${impCount.B},${impCount.C},${impCount.D},${impCount.none}],backgroundColor:['#2ecc71','#3498db','#f39c12','#e74c3c','#bdc3c7'],borderWidth:2,borderColor:'#fff'}]
-},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.label+': '+c.raw}}}}});
+  datasets:[{data:[${impCount.A},${impCount.B},${impCount.C},${impCount.D},${impCount.none}],
+    backgroundColor:['#2ecc71','#3498db','#f39c12','#e74c3c','#bdc3c7'],borderWidth:2,borderColor:'#fff'}]
+},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom'},
+  tooltip:{callbacks:{label:c=>c.label+': '+c.raw}}}}});
 
-// 3. Категории — горизонтальный бар
-const catLabels=${JSON.stringify(catSorted.map(([k])=>k))};
-const catCounts=${JSON.stringify(catSorted.map(([,v])=>v.count))};
+// 3. Категории
 new Chart(document.getElementById('cCat'),{type:'bar',data:{
-  labels:catLabels,
-  datasets:[{label:'Павильонов',data:catCounts,backgroundColor:catLabels.map((_,i)=>PAL[i%PAL.length]),borderRadius:4,borderWidth:0}]
-},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+' пав.'}}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{ticks:{font:{size:11}}}}}});
+  labels:${JSON.stringify(catSorted.map(([k])=>k))},
+  datasets:[{label:'Павильонов',data:${JSON.stringify(catSorted.map(([,v])=>v.count))},
+    backgroundColor:${JSON.stringify(catSorted.map((_,i)=>'#'+['3498db','2ecc71','e74c3c','f39c12','9b59b6','1abc9c','e67e22','34495e','e91e63','00bcd4','8bc34a','ff5722','607d8b','795548','ff9800'][i%15]))},
+    borderRadius:4,borderWidth:0}]
+},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+' пав.'}}},
+  scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{ticks:{font:{size:11}}}}}});
 
-// 4. Заполненность по корпусам (stacked bar)
+// 4. Топ арендаторов
+${hasTenants?`
+const tenLabels=${JSON.stringify(tenantTop.map(([k])=>k))};
+const tenCounts=${JSON.stringify(tenantTop.map(([,c])=>c))};
+const tenPct=${JSON.stringify(tenantTop.map(([,c])=>+(c/${Math.max(total,1)}*100).toFixed(1)))};
+new Chart(document.getElementById('cTen'),{type:'bar',data:{
+  labels:tenLabels,
+  datasets:[{label:'Павильонов',data:tenCounts,
+    backgroundColor:tenLabels.map((_,i)=>PAL[i%PAL.length]),borderRadius:4,borderWidth:0}]
+},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{callbacks:{
+    label:c=>c.raw+' пав. — '+tenPct[c.dataIndex]+'% от всех'
+  }}},
+  scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{ticks:{font:{size:11}}}}}});`:''}
+
+// 5. Заполненность по корпусам
 const bldKeys=${JSON.stringify(bldKeys)};
 new Chart(document.getElementById('cFillBld'),{type:'bar',data:{
   labels:bldKeys,
   datasets:[
-    {label:'Занято',data:${JSON.stringify(bldFilled)},backgroundColor:'#2ecc71cc',borderRadius:4,stack:'s'},
-    {label:'Свободно',data:${JSON.stringify(bldEmpt)},backgroundColor:'#e74c3ccc',borderRadius:0,stack:'s'}
+    {label:'Занято',  data:${JSON.stringify(bldFilled)},backgroundColor:'#2ecc71cc',borderRadius:4,stack:'s'},
+    {label:'Свободно',data:${JSON.stringify(bldEmpt)},  backgroundColor:'#e74c3ccc',borderRadius:0, stack:'s'}
   ]
-},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}});
+},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},
+  scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}});
 
-// 5. Аренда по корпусам
-const rentBldDS=[{label:'План',data:${JSON.stringify(bldPlans)},backgroundColor:'#3498db88',borderColor:'#3498db',borderWidth:1.5,borderRadius:5}];
-${hasFact?`rentBldDS.push({label:'Факт',data:${JSON.stringify(bldFacts)},backgroundColor:'#2ecc7188',borderColor:'#2ecc71',borderWidth:1.5,borderRadius:5});`:''}
-new Chart(document.getElementById('cRentBld'),{type:'bar',data:{labels:bldKeys,datasets:rentBldDS},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toLocaleString('ru-RU')+' ₽'}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}}});
+// 6. Аренда по корпусам
+const rentBldDS=[{label:'План',data:${JSON.stringify(bldPlans)},backgroundColor:'#3498db88',borderColor:'#3498db',borderWidth:1.5,borderRadius:4}];
+${hasFact?`rentBldDS.push({label:'Факт',data:${JSON.stringify(bldFacts)},backgroundColor:'#2ecc7188',borderColor:'#2ecc71',borderWidth:1.5,borderRadius:4});`:''}
+new Chart(document.getElementById('cRentBld'),{type:'bar',data:{labels:bldKeys,datasets:rentBldDS},
+options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},
+  tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toLocaleString('ru-RU')+' ₽'}}},
+  scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}}});
+
+// 7. Средняя ставка: floating bar [min,max] + line avg
+${hasRents?`
+const bldAvg=${JSON.stringify(Object.fromEntries(bldKeys.map(k=>[k,bldAvg[k]])))};
+const bldMin=${JSON.stringify(Object.fromEntries(bldKeys.map(k=>[k,bldMin[k]])))};
+const bldMax=${JSON.stringify(Object.fromEntries(bldKeys.map(k=>[k,bldMax[k]])))};
+const bldWithRent=bldKeys.filter(k=>bldAvg[k]>0);
+new Chart(document.getElementById('cAvgRent'),{
+  type:'bar',
+  data:{
+    labels:bldWithRent,
+    datasets:[
+      {label:'Диапазон (мин → макс)',
+       data:bldWithRent.map(k=>[bldMin[k],bldMax[k]]),
+       backgroundColor:'#3498db33',borderColor:'#3498db',borderWidth:1.5,borderRadius:3,
+       barPercentage:0.5},
+      {label:'Средняя ставка',type:'line',
+       data:bldWithRent.map(k=>bldAvg[k]),
+       borderColor:'#e94560',borderWidth:2.5,pointBackgroundColor:'#e94560',
+       pointRadius:6,pointHoverRadius:8,tension:0,fill:false,order:0}
+    ]
+  },
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top'},
+      tooltip:{callbacks:{
+        label:c=>c.dataset.label===('Средняя ставка')?
+          'Средняя: '+c.raw.toLocaleString('ru-RU')+' ₽':
+          'Мин: '+c.raw[0].toLocaleString('ru-RU')+' ₽ / Макс: '+c.raw[1].toLocaleString('ru-RU')+' ₽'
+      }}},
+    scales:{y:{beginAtZero:false,ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k ₽':v+' ₽'}}}}
+});
+
+// 8. Отклонения: выше/норма/ниже средней ±5%
+const bldAbove=${JSON.stringify(Object.fromEntries(bldKeys.map(k=>[k,bldAbove[k]])))};
+const bldBelow=${JSON.stringify(Object.fromEntries(bldKeys.map(k=>[k,bldBelow[k]])))};
+const bldAt=${JSON.stringify(Object.fromEntries(bldKeys.map(k=>[k,bldAt[k]])))};
+new Chart(document.getElementById('cDev'),{type:'bar',
+  data:{
+    labels:bldWithRent,
+    datasets:[
+      {label:'Выше средней >5%',data:bldWithRent.map(k=>bldAbove[k]),backgroundColor:'#2ecc71bb',borderRadius:4,stack:'d'},
+      {label:'В норме ±5%',     data:bldWithRent.map(k=>bldAt[k]),   backgroundColor:'#3498dbbb',borderRadius:0, stack:'d'},
+      {label:'Ниже средней >5%',data:bldWithRent.map(k=>bldBelow[k]),backgroundColor:'#e74c3cbb',borderRadius:0, stack:'d'}
+    ]
+  },
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw+' пав.'}}},
+    scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}
+});`:''}
 
 ${hasArea?`
-// 6. Площадь по категориям
-const areaEntries=${JSON.stringify(catSorted.filter(([,v])=>v.area>0).map(([k,v])=>({k,a:Math.round(v.area*10)/10})))};
+// 9. Площадь по категориям
+const aE=${JSON.stringify(catSorted.filter(([,v])=>v.area>0).map(([k,v])=>({k,a:Math.round(v.area*10)/10})))};
 new Chart(document.getElementById('cArea'),{type:'bar',data:{
-  labels:areaEntries.map(e=>e.k),
-  datasets:[{label:'Площадь м²',data:areaEntries.map(e=>e.a),backgroundColor:areaEntries.map((_,i)=>PAL[i%PAL.length]),borderRadius:4,borderWidth:0}]
-},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+' м²'}}},scales:{x:{beginAtZero:true},y:{ticks:{font:{size:11}}}}}});`:''}
+  labels:aE.map(e=>e.k),
+  datasets:[{label:'м²',data:aE.map(e=>e.a),
+    backgroundColor:aE.map((_,i)=>PAL[i%PAL.length]),borderRadius:4,borderWidth:0}]
+},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+' м²'}}},
+  scales:{x:{beginAtZero:true},y:{ticks:{font:{size:11}}}}}});`:''}
 
-${floors.length>1?`
-// 7. Этажи — занятость
+${nFloors>1?`
+// 10. Этажи — занятость
 new Chart(document.getElementById('cFloors'),{type:'bar',data:{
   labels:${JSON.stringify(floorData.map(f=>f.name))},
   datasets:[
-    {label:'Занято',data:${JSON.stringify(floorData.map(f=>f.occupied))},backgroundColor:'#2ecc71cc',stack:'s'},
-    {label:'Свободно',data:${JSON.stringify(floorData.map(f=>f.empty))},backgroundColor:'#e74c3ccc',stack:'s'}
+    {label:'Занято',  data:${JSON.stringify(floorData.map(f=>f.occupied))},backgroundColor:'#2ecc71cc',stack:'s'},
+    {label:'Свободно',data:${JSON.stringify(floorData.map(f=>f.empty))},  backgroundColor:'#e74c3ccc',stack:'s'}
   ]
-},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
-
-// 8. Этажи — аренда
-const rentFloorDS=[{label:'План',data:${JSON.stringify(floorData.map(f=>f.rentPlan))},backgroundColor:'#3498db88',borderColor:'#3498db',borderWidth:1.5,borderRadius:5}];
-${hasFact?`rentFloorDS.push({label:'Факт',data:${JSON.stringify(floorData.map(f=>f.rentFact))},backgroundColor:'#2ecc7188',borderColor:'#2ecc71',borderWidth:1.5,borderRadius:5});`:''}
-new Chart(document.getElementById('cRentFloor'),{type:'bar',data:{labels:${JSON.stringify(floorData.map(f=>f.name))},datasets:rentFloorDS},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toLocaleString('ru-RU')+' ₽'}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}}});`:''}
+},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},
+  scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
+// 11. Этажи — аренда
+const rfDS=[{label:'План',data:${JSON.stringify(floorData.map(f=>f.rentPlan))},backgroundColor:'#3498db88',borderColor:'#3498db',borderWidth:1.5,borderRadius:4}];
+${hasFact?`rfDS.push({label:'Факт',data:${JSON.stringify(floorData.map(f=>f.rentFact))},backgroundColor:'#2ecc7188',borderColor:'#2ecc71',borderWidth:1.5,borderRadius:4});`:''}
+new Chart(document.getElementById('cRentFloor'),{type:'bar',data:{labels:${JSON.stringify(floorData.map(f=>f.name))},datasets:rfDS},
+options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},
+  tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toLocaleString('ru-RU')+' ₽'}}},
+  scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}}});`:''}
 
 ${hasFact?`
-// 9. Скидки по корпусам
-const discData=bldKeys.map((_,i)=>{
-  const plan=${JSON.stringify(bldPlans)}[i]; const fact=${JSON.stringify(bldFacts)}[i];
-  return plan>0?Math.round((1-fact/plan)*100*10)/10:0;
-});
+// 12. Скидки
+const discD=bldKeys.map((_,i)=>{const p=${JSON.stringify(bldPlans)}[i],f=${JSON.stringify(bldFacts)}[i];return p>0?Math.round((1-f/p)*100*10)/10:0;});
 new Chart(document.getElementById('cDisc'),{type:'bar',data:{
   labels:${JSON.stringify(bldKeys)},
-  datasets:[{label:'Скидка %',data:discData,backgroundColor:discData.map(v=>v>20?'#e74c3caa':v>10?'#f39c12aa':'#2ecc71aa'),borderRadius:5,borderWidth:0}]
-},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},scales:{y:{beginAtZero:true,max:50,ticks:{callback:v=>v+'%'}}}}});`:''}
+  datasets:[{label:'Скидка %',data:discD,backgroundColor:discD.map(v=>v>20?'#e74c3caa':v>10?'#f39c12aa':'#2ecc71aa'),borderRadius:4,borderWidth:0}]
+},options:{responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},
+  scales:{y:{beginAtZero:true,max:50,ticks:{callback:v=>v+'%'}}}}});`:''}
 <\/script>
 </body>
 </html>`;
+}
 
-  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+function generateReport(){
+  const html = buildReportHTML();
+  const blob = new Blob([html],{type:'text/html;charset=utf-8'});
   const url  = URL.createObjectURL(blob);
-  const w = window.open(url, '_blank');
+  const w = window.open(url,'_blank');
   if(!w) alert('Браузер заблокировал открытие окна. Разреши всплывающие окна для этой страницы.');
 }
 window.generateReport = generateReport;
+window.getReportHTML  = buildReportHTML;
 
 // ── Дропдаун "Файл" ──
 function toggleDropdown(btn){
