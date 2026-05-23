@@ -745,6 +745,23 @@ function migrateStallPositions(){
   if(changed) saveAll();
 }
 
+// Одноразовая чистка прилавков вне любого корпуса (building='X' или несуществующий id)
+function cleanupOrphanStalls(){
+  if(localStorage.getItem('yarmarka-cleanup-orphans-v1')) return;
+  let removed=0;
+  for(const f of floors){
+    const bldIds=new Set((f.buildings||[]).map(b=>b.id));
+    for(const id of Object.keys(f.stalls)){
+      const s=f.stalls[id];
+      if(!s.building || !bldIds.has(s.building)){
+        delete f.stalls[id]; removed++;
+      }
+    }
+  }
+  if(removed>0){ saveAll(); console.log('Удалено прилавков вне корпусов:', removed); }
+  localStorage.setItem('yarmarka-cleanup-orphans-v1','1');
+}
+
 function generateGrid(buildingId, replace=false){
   const b=BUILDINGS.find(x=>x.id===buildingId);
   if(!b)return;
@@ -2525,18 +2542,18 @@ function buildXLSXWorkbook(){
   const num=v=>{const n=Number(v); return isNaN(n)?0:n;};
 
   // ── Лист 1: Прилавки ──
-  const stallRows=[['Этаж','ID','Корпус','X','Y','W','H','Арендатор','Категория','Важность','Аренда план','Аренда факт','Площадь м²','Кол-во прилавков','Заметки']];
+  const stallRows=[['Этаж','ID','Корпус','Арендатор','Категория','Важность','Аренда план','Аренда факт','Площадь м²','Кол-во прилавков','Заметки']];
   for(const fl of floors){
     const ids=Object.keys(fl.stalls).sort();
     for(const id of ids){
       const d=fl.stalls[id];
-      stallRows.push([fl.name, id, d.building||'', num(d.x), num(d.y), num(d.w), num(d.h),
+      stallRows.push([fl.name, id, d.building||'',
         d.tenant||'', d.category||'', d.importance||'',
         num(d.rent), num(d.rentFact), num(d.area), num(d.counters), d.notes||'']);
     }
   }
   const ws1=XLSX.utils.aoa_to_sheet(stallRows);
-  ws1['!cols']=[{wch:10},{wch:12},{wch:8},{wch:6},{wch:6},{wch:6},{wch:6},{wch:28},{wch:22},{wch:8},{wch:13},{wch:13},{wch:12},{wch:30}];
+  ws1['!cols']=[{wch:10},{wch:12},{wch:8},{wch:28},{wch:22},{wch:8},{wch:13},{wch:13},{wch:12},{wch:14},{wch:30}];
   ws1['!freeze']={xSplit:0,ySplit:1};
   XLSX.utils.book_append_sheet(wb, ws1, 'Прилавки');
 
@@ -3607,6 +3624,7 @@ function bindEvents(){
 loadAll();
 ensureInitial();
 migrateStallPositions();
+cleanupOrphanStalls();
 renderFloorTabs();
 buildSVG();
 bindEvents();
