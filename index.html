@@ -2741,12 +2741,17 @@ async function importXLSXFromArrayBuffer(buf){
     const id = String(row['ID']||'').trim();
     if(!id) continue;
 
-    // выбор этажа по колонке «Этаж», иначе текущий
-    let targetStalls = stalls;
+    // выбор этажа: по колонке «Этаж» → иначе ищем ID на всех этажах → иначе текущий
+    let targetStalls = null;
     const floorName = String(row['Этаж']||'').trim();
     if(floorName){
       const f = floors.find(fl=>fl.name===floorName);
       if(f) targetStalls = f.stalls;
+    }
+    if(!targetStalls){
+      // ищем прилавок с таким ID на всех этажах
+      const found = floors.find(fl=>fl.stalls[id]);
+      targetStalls = found ? found.stalls : stalls;
     }
 
     const s = targetStalls[id];
