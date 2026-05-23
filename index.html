@@ -1283,13 +1283,16 @@ function renderStall(svg, id, s){
     }
     // textLength гарантирует что текст не выйдет за пределы прилавка
     const availForText = labelV ? (textH-PAD*2) : (textW-PAD*2);
+    // если у прилавка есть любые данные — номер чёрный жирный
+    const hasFilled = !!(s.tenant||s.category||s.importance||s.rent||s.rentFact||s.area||s.counters||s.notes);
     const tAttrs={
       x:tx, y:ty,
       'text-anchor':'middle', 'dominant-baseline':'central',
       'font-size':fs.toFixed(2),
       'textLength': Math.min(availForText, chars*fs*CHAR_W).toFixed(2),
       'lengthAdjust': 'spacingAndGlyphs',
-      fill:imp?'rgba(255,255,255,.78)':'rgba(100,160,220,.5)',
+      fill: imp ? 'rgba(255,255,255,.78)' : hasFilled ? 'rgba(0,0,0,0.75)' : 'rgba(100,160,220,.5)',
+      'font-weight': hasFilled && !imp ? '700' : 'normal',
       'pointer-events':'none', 'font-family':'sans-serif',
     };
     if(labelV) tAttrs.transform=`rotate(-90 ${tx} ${ty})`;
