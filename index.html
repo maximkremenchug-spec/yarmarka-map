@@ -128,6 +128,8 @@
   body.editing.tool-passage svg.ymap{cursor:crosshair}
   body.editing.tool-flow svg.ymap{cursor:crosshair}
   body.editing.tool-delete svg.ymap{cursor:not-allowed}
+  body.editing.tool-annot svg.ymap{cursor:text}
+  .annot-text{cursor:move;}
   body.editing.tool-vertex svg.ymap{cursor:default}
 
   body.editing.tool-stall .stall-rect,body.editing.tool-passage .stall-rect,body.editing.tool-flow .stall-rect{pointer-events:none;opacity:.55}
@@ -282,6 +284,7 @@
     <button class="tool-btn" onclick="cyclePShape()" title="Сделать выделенные прилавки П-образными / цикл стороны выреза / убрать"><span>∏</span><span class="lbl">П-форма</span></button>
     <button class="tool-btn" onclick="cycleStallLabelOrient()" title="Повернуть номер в выделенных прилавках (горизонтально / снизу-вверх / сброс к настройке здания)"><span>↻</span><span class="lbl">№ угол</span></button>
     <div class="tool-divider"></div>
+    <button class="tool-btn" data-tool="annot" onclick="setTool('annot')" title="Надпись на плане (клик — поставить)"><span>🔤</span><span class="lbl">Надпись</span></button>
     <button class="tool-btn" data-tool="delete" onclick="setTool('delete')" title="Удалить (или ПКМ)"><span>🗑</span><span class="lbl">Удалить</span></button>
   </div>
 
@@ -422,7 +425,7 @@ const IMP_STROKE={A:'#27ae60',B:'#2980b9',C:'#ca6f1e',D:'#c0392b'};
 const IMP_LABELS={A:'A — трафик-генератор',B:'B — стабильный',C:'C — слабый',D:'D — проблемный'};
 const IMP_BG={A:'#0d2e1a',B:'#0d1e34',C:'#2e1c08',D:'#2e0d0d'};
 
-const TOOL_NAMES={pointer:'Двигать',stall:'Прилавок',passage:'Зона',flow:'Поток',vertex:'Контур',site:'Участок',delete:'Удалить'};
+const TOOL_NAMES={pointer:'Двигать',stall:'Прилавок',passage:'Зона',flow:'Поток',vertex:'Контур',site:'Участок',annot:'Надпись',delete:'Удалить'};
 
 const ZONE_TYPES={
   main:    {label:'Главная аллея',     fill:'rgba(52,152,219,.18)', stroke:'#3498db', dash:''},
@@ -483,7 +486,7 @@ let floors=[];               // [{name, stalls, passages, buildings, flows}]
 let currentFloorIdx=0;
 
 // алиасы — указывают на данные текущего этажа
-let stalls={}, passages=[], BUILDINGS=[], flows=[];
+let stalls={}, passages=[], BUILDINGS=[], flows=[], annotations=[];
 
 let selectedId=null;
 // набор выделенных объектов: ключ "type:id"
@@ -645,7 +648,7 @@ function makeDefaultBuildings(){
   return JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
 }
 function makeEmptyFloor(name){
-  return {name, stalls:{}, passages:[], buildings:makeDefaultBuildings(), flows:[], site:null};
+  return {name, stalls:{}, passages:[], buildings:makeDefaultBuildings(), flows:[], site:null, annotations:[]};
 }
 
 function loadAll(){
@@ -662,6 +665,7 @@ function loadAll(){
         if(!f.flows) f.flows=[];
         if(!f.buildings || f.buildings.length===0) f.buildings=makeDefaultBuildings();
         if(f.site===undefined) f.site=null;
+        if(!f.annotations) f.annotations=[];
       }
       syncAliases();
       return;
@@ -702,12 +706,13 @@ function syncAliases(){
   passages=f.passages;
   BUILDINGS=f.buildings;
   flows=f.flows;
+  annotations=f.annotations||[];
 }
 
 function saveAll(){
   // на случай если алиасы реассайнились (после реассигна clearAll и т.п.) — синхронизируем
   const f=floors[currentFloorIdx];
-  f.stalls=stalls; f.passages=passages; f.buildings=BUILDINGS; f.flows=flows;
+  f.stalls=stalls; f.passages=passages; f.buildings=BUILDINGS; f.flows=flows; f.annotations=annotations;
   localStorage.setItem(FLOORS_KEY, JSON.stringify({floors,currentFloorIdx}));
 }
 // псевдо-savers, всё идёт через saveAll
@@ -1017,6 +1022,9 @@ function buildSVG(){
   // потоки — поверх всего
   for(const f of flows) renderFlow(svg, f);
 
+  // текстовые аннотации — поверх всего
+  renderAnnotations(svg);
+
   // оверлеи редактирования
   if(editMode){
     if(currentTool==='vertex') renderVertexHandles(svg);
@@ -1261,6 +1269,27 @@ function renderStall(svg, id, s){
     };
     if(labelV) tAttrs.transform=`rotate(-90 ${tx} ${ty})`;
     svg.appendChild(el('text',tAttrs,num));
+  }
+}
+
+function renderAnnotations(svg){
+  for(const ann of annotations){
+    const selected = editMode && selectionSet.has('annot:'+ann.id);
+    const attrs={
+      'data-id':ann.id, 'data-kind':'annot',
+      x:ann.x, y:ann.y,
+      'font-size':ann.fontSize||16,
+      fill: selected ? '#fff' : (ann.color||'#e94560'),
+      'font-weight':ann.bold?'700':'600',
+      'font-family':'sans-serif',
+      'text-anchor': ann.anchor||'middle',
+      'dominant-baseline':'central',
+      class:'annot-text'+(selected?' edit-selected':''),
+      stroke: selected ? '#e94560' : 'none',
+      'stroke-width': selected ? 0.5 : 0,
+      'paint-order':'stroke',
+    };
+    svg.appendChild(el('text', attrs, ann.text));
   }
 }
 
@@ -1603,6 +1632,26 @@ function onSvgMouseDown(e){
     return;
   }
 
+  // создание надписи
+  if(currentTool==='annot' && kind!=='annot'){
+    e.preventDefault();
+    myPrompt('Текст надписи:','').then(text=>{
+      if(!text||!text.trim()) return;
+      annotations.push({id:'ann-'+Date.now(), x:Math.round(p.x), y:Math.round(p.y), text:text.trim(), fontSize:14, color:'#e94560', bold:true});
+      saveAll(); pushHistory(); buildSVG();
+    });
+    return;
+  }
+
+  // перетаскивание аннотации (pointer или annot)
+  if(kind==='annot' && (currentTool==='pointer'||currentTool==='annot')){
+    e.preventDefault();
+    const ann=annotations.find(a=>a.id===tg.dataset.id);
+    if(!ann) return;
+    dragState={type:'annot', ann, ox:p.x-ann.x, oy:p.y-ann.y};
+    return;
+  }
+
   // перетаскивание подписи корпуса (в любом инструменте, лишь бы был режим редактирования)
   if(kind==='bld-label'){
     e.preventDefault();
@@ -1738,6 +1787,9 @@ function onSvgMouseDown(e){
       if(idx>=0){flows.splice(idx,1); saveAll(); pushHistory(); buildSVG(); updateStats();}
     } else if(kind==='vertex'){
       removeVertex(e);
+    } else if(kind==='annot'){
+      const idx=annotations.findIndex(a=>a.id===tg.dataset.id);
+      if(idx>=0){annotations.splice(idx,1); saveAll(); pushHistory(); buildSVG();}
     }
     return;
   }
@@ -1771,6 +1823,11 @@ function onDocMouseMove(e){
 
   if(dragState){
     const p=svgPoint(e);
+    if(dragState.type==='annot'){
+      dragState.ann.x=Math.round(p.x-dragState.ox);
+      dragState.ann.y=Math.round(p.y-dragState.oy);
+      buildSVG(); return;
+    }
     if(dragState.type==='group-resize'){
       const role=dragState.role;
       let sx=(p.x-dragState.anchor.x)/((role==='nw'||role==='sw'||role==='w')?-dragState.origW:dragState.origW);
@@ -1982,6 +2039,7 @@ function onDocMouseUp(e){
   if(panState){endPan(); return;}
   if(vertexDragging){saveAll(); pushHistory(); vertexDragging=null;}
   if(dragState){
+    if(dragState.type==='annot'){saveAll(); pushHistory(); dragState=null; return;}
     const wasMoved=dragState.moved;
     if(wasMoved){saveAll(); pushHistory();}
     dragState=null;
@@ -2043,6 +2101,10 @@ function onSvgContextMenu(e){
   } else if(kind==='vertex'){
     e.preventDefault();
     removeVertex(e);
+  } else if(kind==='annot'){
+    e.preventDefault();
+    const idx=annotations.findIndex(a=>a.id===tg.dataset.id);
+    if(idx>=0){annotations.splice(idx,1); saveAll(); pushHistory(); buildSVG();}
   }
 }
 
@@ -2057,6 +2119,19 @@ function onSvgDblClick(e){
   }
   if(currentTool==='vertex' && e.target.dataset && e.target.dataset.kind==='vertex'){
     insertVertex(e);
+    return;
+  }
+  // двойной клик по аннотации — редактировать текст
+  if(e.target.dataset && e.target.dataset.kind==='annot'){
+    e.preventDefault();
+    const ann=annotations.find(a=>a.id===e.target.dataset.id);
+    if(!ann) return;
+    myPrompt('Текст надписи:', ann.text).then(t=>{
+      if(t===null) return;
+      if(!t.trim()){annotations.splice(annotations.indexOf(ann),1);}
+      else {ann.text=t.trim();}
+      saveAll(); pushHistory(); buildSVG();
+    });
     return;
   }
   // двойной клик по подписи участка — редактировать
@@ -2442,14 +2517,14 @@ function buildXLSXWorkbook(){
   const num=v=>{const n=Number(v); return isNaN(n)?0:n;};
 
   // ── Лист 1: Прилавки ──
-  const stallRows=[['Этаж','ID','Корпус','X','Y','W','H','Арендатор','Категория','Важность','Аренда ₽/мес','Площадь м²','Контракт до','Заметки']];
+  const stallRows=[['Этаж','ID','Корпус','X','Y','W','H','Арендатор','Категория','Важность','Аренда план','Аренда факт','Площадь м²','Кол-во прилавков','Заметки']];
   for(const fl of floors){
     const ids=Object.keys(fl.stalls).sort();
     for(const id of ids){
       const d=fl.stalls[id];
       stallRows.push([fl.name, id, d.building||'', num(d.x), num(d.y), num(d.w), num(d.h),
         d.tenant||'', d.category||'', d.importance||'',
-        num(d.rent), num(d.area), d.contract||'', d.notes||'']);
+        num(d.rent), num(d.rentFact), num(d.area), num(d.counters), d.notes||'']);
     }
   }
   const ws1=XLSX.utils.aoa_to_sheet(stallRows);
@@ -2731,6 +2806,7 @@ function openFromContent(jsonText, filename){
     if(!fl.passages) fl.passages=[];
     if(!fl.flows) fl.flows=[];
     if(!fl.buildings || fl.buildings.length===0) fl.buildings=makeDefaultBuildings();
+    if(!fl.annotations) fl.annotations=[];
   }
   syncAliases();
   saveAll();
@@ -2867,6 +2943,7 @@ function openFromFile(){
       if(!fl.passages) fl.passages=[];
       if(!fl.flows) fl.flows=[];
       if(!fl.buildings || fl.buildings.length===0) fl.buildings=makeDefaultBuildings();
+      if(!fl.annotations) fl.annotations=[];
     }
     syncAliases();
     saveAll();
@@ -2890,6 +2967,7 @@ function clearAll(){
   Object.keys(stalls).forEach(k=>delete stalls[k]);
   passages.length=0;
   flows.length=0;
+  annotations.length=0;
   saveAll(); pushHistory();
   selectionSet.clear();selectedId=null;
   closeSidebar();
