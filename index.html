@@ -264,6 +264,13 @@
 
 <div class="toolbar">
   <div class="floor-tabs" id="floor-tabs" style="flex:1"></div>
+  <div class="dropdown">
+    <button class="btn btn-icon" onclick="toggleDropdown(this)" title="Файл">📂</button>
+    <div class="dropdown-menu">
+      <button onclick="closeAllDropdowns();importXLSX()">📥 Импорт из Excel…</button>
+      <button onclick="closeAllDropdowns();exportXLSX()">📤 Экспорт в Excel…</button>
+    </div>
+  </div>
   <button class="btn btn-icon" id="btn-theme" onclick="toggleTheme()" title="Светлая / тёмная тема">🌓</button>
   <button class="btn btn-icon" id="btn-undo" onclick="undo()" title="Отменить (Cmd+Z)" disabled>↶</button>
   <button class="btn btn-icon" id="btn-redo" onclick="redo()" title="Повторить (Cmd+Shift+Z)" disabled>↷</button>
