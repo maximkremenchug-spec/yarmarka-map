@@ -2886,7 +2886,8 @@ function buildReportHTML(){
     tenantMap[s.tenant]=(tenantMap[s.tenant]||0)+1;
   }
   const tenantTop = Object.entries(tenantMap).sort((a,b)=>b[1]-a[1]).slice(0,15);
-  const hasMultiTenant = tenantTop.some(([,c])=>c>1);
+  const safeTotal = Math.max(total,1);
+  const tenantTopPct = tenantTop.map(([,c])=>Math.round(c/safeTotal*1000)/10);
 
   // По этажам
   const floorData = floors.map(fl=>{
@@ -3064,7 +3065,7 @@ new Chart(document.getElementById('cCat'),{type:'bar',data:{
 ${hasTenants?`
 const tenLabels=${JSON.stringify(tenantTop.map(([k])=>k))};
 const tenCounts=${JSON.stringify(tenantTop.map(([,c])=>c))};
-const tenPct=${JSON.stringify(tenantTop.map(([,c])=>+(c/${Math.max(total,1)}*100).toFixed(1)))};
+const tenPct=${JSON.stringify(tenantTopPct)};
 new Chart(document.getElementById('cTen'),{type:'bar',data:{
   labels:tenLabels,
   datasets:[{label:'Павильонов',data:tenCounts,
