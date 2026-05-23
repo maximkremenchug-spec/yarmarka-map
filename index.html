@@ -3029,10 +3029,15 @@ Chart.defaults.font.size=11;
 Chart.defaults.color='#4a5568';
 const PAL=['#3498db','#2ecc71','#e74c3c','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#e91e63','#00bcd4','#8bc34a','#ff5722','#607d8b','#795548','#ff9800'];
 
-// ── Сохранение PDF (⌘S / Ctrl+S) ──
+// ── Сохранение PDF ──
+// В Electron: кнопка меняет title → main process перехватывает → printToPDF
+// В браузере: fallback на window.print()
 function savePDF(){
-  document.title='Отчёт_${new Date().toISOString().slice(0,10)}';
-  window.print();
+  if(navigator.userAgent.indexOf('Electron')!==-1){
+    document.title='__SAVE_PDF__';
+  } else {
+    window.print();
+  }
 }
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();savePDF();}});
 
