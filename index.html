@@ -2958,7 +2958,7 @@ function buildReportHTML(){
   });
   const withDiscount   = discStalls.filter(s=>s.discPct!==null&&s.discPct>0);
   const noDiscountStls = discStalls.filter(s=>s.discPct!==null&&s.discPct<=0);
-  const totalDiscAmt   = Math.round(withDiscount.reduce((a,s)=>a+(s.plan-s.fact),0));
+  const totalDiscAmt   = Math.round(totalRentPlan - totalRentFact); // весь незачисленный план vs факт
   const avgDiscPct     = withDiscount.length ? Math.round(withDiscount.reduce((a,s)=>a+s.discPct,0)/withDiscount.length*10)/10 : 0;
   const discBucket0    = noDiscountStls.length;
   const discBucket1    = withDiscount.filter(s=>s.discPct<=10).length;
@@ -3070,8 +3070,8 @@ h1{font-size:22px;font-weight:800;color:#e94560;margin-bottom:3px}
   ${hasDisc?`<!-- KPI скидок -->
   <div style="margin-bottom:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#e94560">📉 Аналитика скидок</div>
   <div class="kpi-grid" style="margin-bottom:22px">
-    <div class="kpi r"><div class="kpi-label">Сумма скидок ₽/мес</div><div class="kpi-val" style="font-size:19px">${fmt(totalDiscAmt)}</div><div class="kpi-sub">план − факт</div></div>
-    <div class="kpi o"><div class="kpi-label">Средняя скидка %</div><div class="kpi-val">${avgDiscPct}%</div><div class="kpi-sub">по павильонам со скидкой</div></div>
+    <div class="kpi r"><div class="kpi-label">Сумма скидок ₽/мес</div><div class="kpi-val" style="font-size:19px">${fmt(totalDiscAmt)}</div><div class="kpi-sub">план − факт (все)</div></div>
+    <div class="kpi o"><div class="kpi-label">Средняя скидка %</div><div class="kpi-val">${discountPct}%</div><div class="kpi-sub">от общего плана</div></div>
     <div class="kpi"><div class="kpi-label">Со скидкой</div><div class="kpi-val">${withDiscount.length}</div><div class="kpi-sub">павильонов</div></div>
     <div class="kpi g"><div class="kpi-label">Без скидки</div><div class="kpi-val">${noDiscountStls.length}</div><div class="kpi-sub">платят полный план</div></div>
     ${discBucketNF>0?`<div class="kpi"><div class="kpi-label">Факт не указан</div><div class="kpi-val">${discBucketNF}</div><div class="kpi-sub">есть план, нет факта</div></div>`:''}
