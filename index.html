@@ -1286,7 +1286,9 @@ function renderStall(svg, id, s){
     // textLength гарантирует что текст не выйдет за пределы прилавка
     const availForText = labelV ? (textH-PAD*2) : (textW-PAD*2);
     // если у прилавка есть любые данные — номер чёрный жирный
-    const hasFilled = !!(s.tenant||s.category||s.importance||s.rent||s.rentFact||s.area||s.counters||s.notes);
+    // Жирный чёрный номер — только если есть арендатор или важность
+    // (аренда/площадь могут быть импортированы для пустых павильонов)
+    const hasFilled = !!(s.tenant || s.importance);
     const tAttrs={
       x:tx, y:ty,
       'text-anchor':'middle', 'dominant-baseline':'central',
