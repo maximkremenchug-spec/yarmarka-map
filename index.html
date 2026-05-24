@@ -2912,7 +2912,7 @@ function buildReportHTML(){
   });
   const withDiscount   = discStalls.filter(s=>s.discPct!==null&&s.discPct>0);
   const noDiscountStls = discStalls.filter(s=>s.discPct!==null&&s.discPct<=0);
-  const totalDiscAmt   = Math.round(totalRentPlan - totalRentFact);
+  const totalDiscAmt   = Math.round(withDiscount.reduce((a,s)=>a+(s.plan-s.fact),0));
   const avgDiscPct     = withDiscount.length ? Math.round(withDiscount.reduce((a,s)=>a+s.discPct,0)/withDiscount.length*10)/10 : 0;
   const discBucket0    = noDiscountStls.length;
   const discBucket1    = withDiscount.filter(s=>s.discPct<=10).length;
