@@ -3014,6 +3014,75 @@ function buildReportHTML(){
   const nFloors  = floors.length;
   const flLabel  = nFloors===1?'этаж':nFloors<5?'этажа':'этажей';
 
+  // ── Контроль: должники ──
+  const debtors = discSource
+    .filter(s=>num(s.rent)>0 && num(s.rent)>num(s.rentFact))
+    .map(s=>({id:s.id, tenant:s.tenant||'—', building:s.building||s.floorName||'?',
+              plan:num(s.rent), fact:num(s.rentFact), gap:Math.round(num(s.rent)-num(s.rentFact)),
+              pct:Math.round((num(s.rent)-num(s.rentFact))/num(s.rent)*100)}))
+    .sort((a,b)=>b.gap-a.gap).slice(0,20);
+  const hasDebtors = debtors.length>0;
+
+  // ── Контроль: аномальные скидки > 30% ──
+  const anomaly = discSource
+    .filter(s=>num(s.rent)>0 && num(s.rentFact)>0 && (num(s.rent)-num(s.rentFact))/num(s.rent)*100 > 30)
+    .map(s=>({id:s.id, tenant:s.tenant||'—', building:s.building||s.floorName||'?',
+              plan:num(s.rent), fact:num(s.rentFact),
+              pct:Math.round((num(s.rent)-num(s.rentFact))/num(s.rent)*100),
+              gap:Math.round(num(s.rent)-num(s.rentFact))}))
+    .sort((a,b)=>b.pct-a.pct);
+  const hasAnomaly = anomaly.length>0;
+
+  // ── Контроль: арендаторы с несколькими прилавками и скидкой ──
+  const tenantDisc = {};
+  for(const s of discSource){
+    if(!s.tenant) continue;
+    const t = s.tenant;
+    if(!tenantDisc[t]) tenantDisc[t]={stalls:0, withDisc:0, totalGap:0, totalPlan:0, building:new Set()};
+    tenantDisc[t].stalls++;
+    tenantDisc[t].totalPlan += num(s.rent);
+    if(num(s.rent)>0 && num(s.rentFact)>0 && num(s.rent)>num(s.rentFact)){
+      tenantDisc[t].withDisc++;
+      tenantDisc[t].totalGap += num(s.rent)-num(s.rentFact);
+    }
+    if(s.building) tenantDisc[t].building.add(s.building);
+  }
+  const tenantDiscList = Object.entries(tenantDisc)
+    .filter(([,v])=>v.stalls>=2 && v.withDisc>0)
+    .map(([name,v])=>({name, stalls:v.stalls, withDisc:v.withDisc,
+      totalGap:Math.round(v.totalGap), avgDiscPct:v.totalPlan>0?Math.round(v.totalGap/v.totalPlan*100):0,
+      buildings:[...v.building].join(', ')}))
+    .sort((a,b)=>b.totalGap-a.totalGap).slice(0,15);
+  const hasTenantDisc = tenantDiscList.length>0;
+
+  // ── Контроль: ставка ниже 60% от средней по корпусу ──
+  const lowRate = [];
+  for(const fl of floors){
+    const bldDefs = fl.buildings||[];
+    for(const [id,s] of Object.entries(fl.stalls)){
+      if(!num(s.rent) || !s.tenant) continue;
+      const bid = s.building||'X';
+      const def = bldDefs.find(b=>b.id===bid);
+      const lbl = def&&def.label ? def.label : bid;
+      const key = lbl;
+      const avg = bldAvg[key]||0;
+      if(avg>0 && num(s.rent) < avg*0.6){
+        lowRate.push({id, tenant:s.tenant||'—', building:lbl,
+          rent:Math.round(num(s.rent)), avg, pct:Math.round(num(s.rent)/avg*100)});
+      }
+    }
+  }
+  lowRate.sort((a,b)=>a.pct-b.pct);
+  const hasLowRate = lowRate.length>0;
+
+  // ── Контроль: занятые прилавки без поступления факта ──
+  const ghostStalls = discSource
+    .filter(s=>s.tenant && num(s.rent)>0 && !num(s.rentFact))
+    .map(s=>({id:s.id, tenant:s.tenant, building:s.building||s.floorName||'?', plan:num(s.rent)}))
+    .sort((a,b)=>b.plan-a.plan);
+  const ghostTotal = ghostStalls.reduce((a,s)=>a+s.plan,0);
+  const hasGhost = ghostStalls.length>0;
+
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -3159,6 +3228,110 @@ h1{font-size:22px;font-weight:800;color:#e94560;margin-bottom:3px}
       <span style="font-size:11px;display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:16px;height:12px;background:#dde6ef;border-radius:2px"></span>Нет данных</span>
     </div>
     ${heatmapDivs}
+  </div></div>`:''}
+
+  <!-- ══════ КОНТРОЛЬНЫЕ БЛОКИ ══════ -->
+  <div style="margin:28px 0 8px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#c0392b;border-bottom:2px solid #e74c3c;padding-bottom:6px">🔍 Контроль и аналитика рисков</div>
+
+  ${hasDebtors?`<!-- Топ должников -->
+  <div class="grid1"><div class="card">
+    <h2>💸 Топ-20 должников — план не выполнен (₽/мес)</h2>
+    <div class="chart-wrap" style="height:${Math.max(220, debtors.length*28)}px"><canvas id="cDebt"></canvas></div>
+  </div></div>`:''}
+
+  ${hasAnomaly?`<!-- Аномальные скидки -->
+  <div class="grid1"><div class="card" style="border-left:3px solid #e74c3c">
+    <h2>🚨 Аномальные скидки &gt; 30% — требуют проверки (${anomaly.length} пав.)</h2>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:#fdf0ee">
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #f5c6c6">ID</th>
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #f5c6c6">Арендатор</th>
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #f5c6c6">Корпус</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #f5c6c6">План ₽</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #f5c6c6">Факт ₽</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #f5c6c6">Скидка ₽</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #f5c6c6">Скидка %</th>
+      </tr></thead>
+      <tbody>${anomaly.map((s,i)=>`<tr style="background:${i%2?'#fff':'#fff9f9'}">
+        <td style="padding:5px 8px;font-weight:700;color:#c0392b">#${s.id}</td>
+        <td style="padding:5px 8px">${s.tenant}</td>
+        <td style="padding:5px 8px;color:#666">${s.building}</td>
+        <td style="padding:5px 8px;text-align:right">${fmt(s.plan)}</td>
+        <td style="padding:5px 8px;text-align:right">${fmt(Math.round(s.fact))}</td>
+        <td style="padding:5px 8px;text-align:right;color:#c0392b;font-weight:700">−${fmt(s.gap)}</td>
+        <td style="padding:5px 8px;text-align:right"><span style="background:#e74c3c;color:#fff;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:700">${s.pct}%</span></td>
+      </tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div></div>`:''}
+
+  ${hasTenantDisc?`<!-- Концентрация скидок у арендаторов -->
+  <div class="grid1"><div class="card" style="border-left:3px solid #e67e22">
+    <h2>🤝 Арендаторы с несколькими прилавками и скидкой — риск сговора</h2>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:#fef9ee">
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fad7a0">Арендатор</th>
+        <th style="padding:6px 8px;text-align:center;border-bottom:1px solid #fad7a0">Прилавков</th>
+        <th style="padding:6px 8px;text-align:center;border-bottom:1px solid #fad7a0">Со скидкой</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #fad7a0">Итого скидка ₽</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #fad7a0">Ср. скидка %</th>
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #fad7a0">Корпуса</th>
+      </tr></thead>
+      <tbody>${tenantDiscList.map((t,i)=>`<tr style="background:${i%2?'#fff':'#fffdf7'}">
+        <td style="padding:5px 8px;font-weight:600">${t.name}</td>
+        <td style="padding:5px 8px;text-align:center">${t.stalls}</td>
+        <td style="padding:5px 8px;text-align:center;color:#e67e22;font-weight:700">${t.withDisc}</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:700">−${fmt(t.totalGap)}</td>
+        <td style="padding:5px 8px;text-align:right"><span style="background:${t.avgDiscPct>30?'#e74c3c':t.avgDiscPct>15?'#e67e22':'#f39c12'};color:#fff;padding:2px 6px;border-radius:10px;font-size:10px">${t.avgDiscPct}%</span></td>
+        <td style="padding:5px 8px;color:#666;font-size:10px">${t.buildings}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div></div>`:''}
+
+  ${hasLowRate?`<!-- Подозрительно низкая ставка -->
+  <div class="grid1"><div class="card" style="border-left:3px solid #9b59b6">
+    <h2>📉 Ставка ниже 60% от средней по корпусу — возможна неофициальная договорённость</h2>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:#f5eef8">
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #d2b4de">ID</th>
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #d2b4de">Арендатор</th>
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #d2b4de">Корпус</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #d2b4de">Ставка ₽</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #d2b4de">Ср. по корпусу ₽</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #d2b4de">% от средней</th>
+      </tr></thead>
+      <tbody>${lowRate.slice(0,20).map((s,i)=>`<tr style="background:${i%2?'#fff':'#fdf5ff'}">
+        <td style="padding:5px 8px;font-weight:700;color:#8e44ad">#${s.id}</td>
+        <td style="padding:5px 8px">${s.tenant}</td>
+        <td style="padding:5px 8px;color:#666">${s.building}</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:700">${fmt(s.rent)}</td>
+        <td style="padding:5px 8px;text-align:right;color:#666">${fmt(s.avg)}</td>
+        <td style="padding:5px 8px;text-align:right"><span style="background:#9b59b6;color:#fff;padding:2px 6px;border-radius:10px;font-size:10px">${s.pct}%</span></td>
+      </tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div></div>`:''}
+
+  ${hasGhost?`<!-- Серая аренда -->
+  <div class="grid1"><div class="card" style="border-left:3px solid #7f8c8d">
+    <h2>👻 Занятые прилавки без факта оплаты — возможна оплата мимо кассы (${ghostStalls.length} пав., план ${fmt(Math.round(ghostTotal))} ₽)</h2>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:#f2f3f4">
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #d5d8dc">ID</th>
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #d5d8dc">Арендатор</th>
+        <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #d5d8dc">Корпус</th>
+        <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #d5d8dc">План ₽/мес</th>
+      </tr></thead>
+      <tbody>${ghostStalls.slice(0,30).map((s,i)=>`<tr style="background:${i%2?'#fff':'#f8f9fa'}">
+        <td style="padding:5px 8px;font-weight:700;color:#7f8c8d">#${s.id}</td>
+        <td style="padding:5px 8px">${s.tenant}</td>
+        <td style="padding:5px 8px;color:#666">${s.building}</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:700">${fmt(Math.round(s.plan))}</td>
+      </tr>`).join('')}
+      ${ghostStalls.length>30?`<tr><td colspan="4" style="padding:6px 8px;color:#999;font-size:10px;text-align:center">...и ещё ${ghostStalls.length-30} павильонов</td></tr>`:''}
+      </tbody>
+    </table></div>
   </div></div>`:''}
 
 </div>
@@ -3387,6 +3560,26 @@ heatFloors.forEach((fl,idx)=>{
     r.appendChild(ti); svg.appendChild(r);
   }
   cont.appendChild(svg);
+});`:''}
+
+${hasDebtors?`
+// 16. Топ должников
+const debtData=${JSON.stringify(debtors)};
+new Chart(document.getElementById('cDebt'),{type:'bar',
+  data:{
+    labels:debtData.map(s=>'#'+s.id+(s.tenant&&s.tenant!=='—'?' '+s.tenant.slice(0,16):'')),
+    datasets:[
+      {label:'Факт ₽',data:debtData.map(s=>s.fact),backgroundColor:'#2ecc7188',borderColor:'#2ecc71',borderWidth:1,borderRadius:3,stack:'s'},
+      {label:'Недоплата ₽',data:debtData.map(s=>s.gap),backgroundColor:'#e74c3ccc',borderColor:'#e74c3c',borderWidth:1,borderRadius:3,stack:'s'}
+    ]
+  },
+  options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top'},
+      tooltip:{callbacks:{label:c=>{
+        if(c.dataset.label==='Недоплата ₽') return 'Недоплата: '+c.raw.toLocaleString('ru-RU')+' ₽ ('+debtData[c.dataIndex].pct+'%)';
+        return 'Факт: '+c.raw.toLocaleString('ru-RU')+' ₽';
+      }}}},
+    scales:{x:{stacked:true,ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}},y:{stacked:true,ticks:{font:{size:10}}}}}
 });`:''}
 <\/script>
 </body>
