@@ -2419,7 +2419,7 @@ function calcDiscount(){
   const fact=parseFloat(document.getElementById('f-rent-fact').value);
   const el=document.getElementById('f-discount');
   if(plan>0 && !isNaN(fact)){
-    const pct=(fact/plan*100).toFixed(1);
+    const pct=((plan-fact)/plan*100).toFixed(1);
     el.value=pct+'%';
   } else {
     el.value='';
