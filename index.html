@@ -2904,8 +2904,54 @@ function buildReportHTML(){
     };
   });
 
+  // ── Аналитика скидок ──
+  const discStalls = allStalls.map(s=>{
+    const plan=num(s.rent), fact=num(s.rentFact);
+    const dp = plan>0&&fact>0 ? (plan-fact)/plan*100 : null;
+    return {id:s.id, tenant:s.tenant||'', plan, fact, discPct:dp, hasPlan:plan>0, hasFact:fact>0};
+  });
+  const withDiscount   = discStalls.filter(s=>s.discPct!==null&&s.discPct>0);
+  const noDiscountStls = discStalls.filter(s=>s.discPct!==null&&s.discPct<=0);
+  const totalDiscAmt   = Math.round(totalRentPlan - totalRentFact);
+  const avgDiscPct     = withDiscount.length ? Math.round(withDiscount.reduce((a,s)=>a+s.discPct,0)/withDiscount.length*10)/10 : 0;
+  const discBucket0    = noDiscountStls.length;
+  const discBucket1    = withDiscount.filter(s=>s.discPct<=10).length;
+  const discBucket2    = withDiscount.filter(s=>s.discPct>10&&s.discPct<=25).length;
+  const discBucket3    = withDiscount.filter(s=>s.discPct>25).length;
+  const discBucketNF   = discStalls.filter(s=>s.hasPlan&&!s.hasFact).length;
+
+  // Топ-20 павильонов по абсолютной скидке
+  const topDisc = withDiscount
+    .map(s=>({id:s.id, tenant:s.tenant, discAmt:Math.round(s.plan-s.fact), discPct:Math.round(s.discPct*10)/10}))
+    .sort((a,b)=>b.discAmt-a.discAmt).slice(0,20);
+  const topDiscLabels = topDisc.map(s=>'#'+s.id+(s.tenant?' '+s.tenant.slice(0,18):''));
+  const topDiscAmts   = topDisc.map(s=>s.discAmt);
+  const topDiscPcts   = topDisc.map(s=>s.discPct);
+  const topDiscColors = topDiscPcts.map(p=>p>25?'#e74c3caa':p>10?'#e67e22aa':'#f1c40faa');
+
+  // Тепловая карта: координаты павильонов + скидка
+  const heatmapFloors = floors.map(fl=>({
+    name: fl.name,
+    buildings: (fl.buildings||[]).map(b=>({
+      x:+(b.x||0), y:+(b.y||0), w:+(b.w||0), h:+(b.h||0), label:b.label||b.id||''
+    })),
+    stalls: Object.entries(fl.stalls).map(([id,s])=>{
+      const plan=num(s.rent), fact=num(s.rentFact);
+      const dp = plan>0&&fact>0 ? Math.round((plan-fact)/plan*1000)/10 : null;
+      return {id, x:+(s.x||0), y:+(s.y||0), w:+(s.w||10), h:+(s.h||10),
+        discPct:dp, hasFact:fact>0, hasPlan:plan>0, hasTenant:!!(s.tenant)};
+    })
+  }));
+  const heatmapJSON = JSON.stringify(heatmapFloors);
+  // Теги для SVG блоков тепловой карты
+  const heatmapDivs = heatmapFloors.map((fl,i)=>
+    '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#4a5568;margin-bottom:4px">'+fl.name+'</div>'+
+    '<div id="hmap-'+i+'" style="width:100%;height:380px;border-radius:6px;overflow:hidden;background:#f4f7fb"></div></div>'
+  ).join('');
+
   const fmt      = n => n.toLocaleString('ru-RU');
   const hasFact  = totalRentFact>0;
+  const hasDisc  = hasFact && withDiscount.length>0;
   const hasArea  = totalArea>0;
   const hasRents = bldKeys.some(k=>bldMap[k].rents.length>0);
   const hasTenants = tenantTop.length>0;
@@ -2974,6 +3020,16 @@ h1{font-size:22px;font-weight:800;color:#e94560;margin-bottom:3px}
     ${hasRents?`<div class="kpi"><div class="kpi-label">Арендаторов уникальных</div><div class="kpi-val">${Object.keys(tenantMap).length}</div><div class="kpi-sub">арендуют ${occupied} пав.</div></div>`:''}
   </div>
 
+  ${hasDisc?`<!-- KPI скидок -->
+  <div style="margin-bottom:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#e94560">📉 Аналитика скидок</div>
+  <div class="kpi-grid" style="margin-bottom:22px">
+    <div class="kpi r"><div class="kpi-label">Сумма скидок ₽/мес</div><div class="kpi-val" style="font-size:19px">${fmt(totalDiscAmt)}</div><div class="kpi-sub">план − факт</div></div>
+    <div class="kpi o"><div class="kpi-label">Средняя скидка %</div><div class="kpi-val">${avgDiscPct}%</div><div class="kpi-sub">по павильонам со скидкой</div></div>
+    <div class="kpi"><div class="kpi-label">Со скидкой</div><div class="kpi-val">${withDiscount.length}</div><div class="kpi-sub">павильонов</div></div>
+    <div class="kpi g"><div class="kpi-label">Без скидки</div><div class="kpi-val">${noDiscountStls.length}</div><div class="kpi-sub">платят полный план</div></div>
+    ${discBucketNF>0?`<div class="kpi"><div class="kpi-label">Факт не указан</div><div class="kpi-val">${discBucketNF}</div><div class="kpi-sub">есть план, нет факта</div></div>`:''}
+  </div>`:''}
+
   <!-- Занятость + Важность -->
   <div class="grid2">
     <div class="card"><h2>🏪 Занятость павильонов</h2>
@@ -3022,6 +3078,30 @@ h1{font-size:22px;font-weight:800;color:#e94560;margin-bottom:3px}
 
   ${hasFact?`<div class="grid1"><div class="card"><h2>📉 Размер скидки по корпусам (%)</h2>
     <div class="chart-wrap" style="height:200px"><canvas id="cDisc"></canvas></div>
+  </div></div>`:''}
+
+  ${hasDisc?`
+  <!-- Распределение скидок + топ по павильонам -->
+  <div class="grid2">
+    <div class="card"><h2>📊 Распределение скидок по уровням</h2>
+      <div class="chart-wrap" style="height:250px"><canvas id="cDiscDist"></canvas></div></div>
+    <div class="card"><h2>🏷 Топ-20 павильонов по размеру скидки (₽/мес)</h2>
+      <div class="chart-wrap" style="height:${Math.max(250, topDisc.length*26)}px"><canvas id="cDiscTop"></canvas></div></div>
+  </div>
+
+  <!-- Тепловая карта скидок -->
+  <div class="grid1"><div class="card">
+    <h2>🌡 Тепловая карта скидок по павильонам</h2>
+    <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;color:#666;font-weight:600">Легенда:</span>
+      <span style="font-size:11px;display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:16px;height:12px;background:#2ecc71;border-radius:2px"></span>Без скидки (0%)</span>
+      <span style="font-size:11px;display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:16px;height:12px;background:#f1c40f;border-radius:2px"></span>1–10%</span>
+      <span style="font-size:11px;display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:16px;height:12px;background:#e67e22;border-radius:2px"></span>11–25%</span>
+      <span style="font-size:11px;display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:16px;height:12px;background:#e74c3c;border-radius:2px"></span>&gt;25%</span>
+      <span style="font-size:11px;display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:16px;height:12px;background:#c8d8e8;border-radius:2px"></span>Арендатор, нет факта</span>
+      <span style="font-size:11px;display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:16px;height:12px;background:#dde6ef;border-radius:2px"></span>Нет данных</span>
+    </div>
+    ${heatmapDivs}
   </div></div>`:''}
 
 </div>
@@ -3181,14 +3261,76 @@ options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'to
   scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}}});`:''}
 
 ${hasFact?`
-// 12. Скидки
-const discD=bldKeys.map((_,i)=>{const p=${JSON.stringify(bldPlans)}[i],f=${JSON.stringify(bldFacts)}[i];return p>0?Math.round((1-f/p)*100*10)/10:0;});
+// 12. Скидки по корпусам
+const discD=bldKeys.map((_,i)=>{const p=${JSON.stringify(bldPlans)}[i],f=${JSON.stringify(bldFacts)}[i];return p>0?Math.round((p-f)/p*100*10)/10:0;});
 new Chart(document.getElementById('cDisc'),{type:'bar',data:{
   labels:${JSON.stringify(bldKeys)},
   datasets:[{label:'Скидка %',data:discD,backgroundColor:discD.map(v=>v>20?'#e74c3caa':v>10?'#f39c12aa':'#2ecc71aa'),borderRadius:4,borderWidth:0}]
 },options:{responsive:true,maintainAspectRatio:false,
   plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},
   scales:{y:{beginAtZero:true,max:50,ticks:{callback:v=>v+'%'}}}}});`:''}
+
+${hasDisc?`
+// 13. Распределение скидок
+new Chart(document.getElementById('cDiscDist'),{type:'doughnut',data:{
+  labels:['Без скидки 0%','Малая 1–10%','Средняя 11–25%','Высокая >25%','Факт не указан'],
+  datasets:[{data:[${discBucket0},${discBucket1},${discBucket2},${discBucket3},${discBucketNF}],
+    backgroundColor:['#2ecc71','#f1c40f','#e67e22','#e74c3c','#bdc3c7'],borderWidth:2,borderColor:'#fff'}]
+},options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
+  plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.label+': '+c.raw+' пав.'}}}}});
+
+// 14. Топ скидок по павильонам
+new Chart(document.getElementById('cDiscTop'),{type:'bar',data:{
+  labels:${JSON.stringify(topDiscLabels)},
+  datasets:[{label:'Скидка ₽/мес',data:${JSON.stringify(topDiscAmts)},
+    backgroundColor:${JSON.stringify(topDiscColors)},borderRadius:4,borderWidth:0}]
+},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{
+    const p=${JSON.stringify(topDiscPcts)}[c.dataIndex];
+    return c.raw.toLocaleString('ru-RU')+' ₽ (скидка '+p+'%)';
+  }}}},
+  scales:{x:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}},
+    y:{ticks:{font:{size:10}}}}}});
+
+// 15. Тепловая карта
+const heatFloors=${heatmapJSON};
+function discFill(s){
+  if(!s.hasFact) return s.hasTenant?'#c8d8e8':'#dde6ef';
+  if(s.discPct===null||s.discPct<=0) return '#2ecc71';
+  if(s.discPct<=10) return '#f1c40f';
+  if(s.discPct<=25) return '#e67e22';
+  return '#e74c3c';
+}
+heatFloors.forEach((fl,idx)=>{
+  const cont=document.getElementById('hmap-'+idx);
+  if(!cont) return;
+  const NS='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(NS,'svg');
+  svg.setAttribute('viewBox','-80 -60 960 1090');
+  svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+  svg.style.cssText='width:100%;height:100%;display:block';
+  const mk=(tag,attrs)=>{const el=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));return el;};
+  svg.appendChild(mk('rect',{x:'-80',y:'-60',width:'960',height:'1090',fill:'#f0f4f8'}));
+  for(const b of fl.buildings){
+    svg.appendChild(mk('rect',{x:b.x,y:b.y,width:b.w,height:b.h,fill:'#e4ecf5',stroke:'#94b4cc','stroke-width':'1.5',rx:'2'}));
+    if(b.label){
+      const t=document.createElementNS(NS,'text');
+      t.setAttribute('x',b.x+b.w/2); t.setAttribute('y',b.y+13);
+      t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','11');
+      t.setAttribute('fill','#3a5a78'); t.setAttribute('font-weight','700');
+      t.setAttribute('font-family','sans-serif'); t.textContent=b.label;
+      svg.appendChild(t);
+    }
+  }
+  for(const s of fl.stalls){
+    const r=mk('rect',{x:s.x,y:s.y,width:s.w,height:s.h,
+      fill:discFill(s),stroke:'rgba(255,255,255,0.7)','stroke-width':'0.4',rx:'0.5'});
+    const ti=document.createElementNS(NS,'title');
+    ti.textContent='#'+s.id+(s.discPct!==null?' — скидка: '+s.discPct+'%':s.hasFact?' — без скидки':s.hasPlan?' — факт не указан':'');
+    r.appendChild(ti); svg.appendChild(r);
+  }
+  cont.appendChild(svg);
+});`:''}
 <\/script>
 </body>
 </html>`;
