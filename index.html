@@ -3017,7 +3017,7 @@ function buildReportHTML(){
   // ── Контроль: должники ──
   const debtors = discSource
     .filter(s=>num(s.rent)>0 && num(s.rent)>num(s.rentFact))
-    .map(s=>({id:s.id, tenant:s.tenant||'—', building:s.building||s.floorName||'?',
+    .map(s=>({id:s.id, tenant:s.tenant||'—', building:s.building||s.floorName||(s._extra?'вне схемы':'?'),
               plan:num(s.rent), fact:num(s.rentFact), gap:Math.round(num(s.rent)-num(s.rentFact)),
               pct:Math.round((num(s.rent)-num(s.rentFact))/num(s.rent)*100)}))
     .sort((a,b)=>b.gap-a.gap).slice(0,20);
@@ -3026,7 +3026,7 @@ function buildReportHTML(){
   // ── Контроль: аномальные скидки > 30% ──
   const anomaly = discSource
     .filter(s=>num(s.rent)>0 && num(s.rentFact)>0 && (num(s.rent)-num(s.rentFact))/num(s.rent)*100 > 30)
-    .map(s=>({id:s.id, tenant:s.tenant||'—', building:s.building||s.floorName||'?',
+    .map(s=>({id:s.id, tenant:s.tenant||'—', building:s.building||s.floorName||(s._extra?'вне схемы':'?'),
               plan:num(s.rent), fact:num(s.rentFact),
               pct:Math.round((num(s.rent)-num(s.rentFact))/num(s.rent)*100),
               gap:Math.round(num(s.rent)-num(s.rentFact))}))
@@ -3078,7 +3078,7 @@ function buildReportHTML(){
   // ── Контроль: занятые прилавки без поступления факта ──
   const ghostStalls = discSource
     .filter(s=>s.tenant && num(s.rent)>0 && !num(s.rentFact))
-    .map(s=>({id:s.id, tenant:s.tenant, building:s.building||s.floorName||'?', plan:num(s.rent)}))
+    .map(s=>({id:s.id, tenant:s.tenant, building:s.building||s.floorName||(s._extra?'вне схемы':'?'), plan:num(s.rent)}))
     .sort((a,b)=>b.plan-a.plan);
   const ghostTotal = ghostStalls.reduce((a,s)=>a+s.plan,0);
   const hasGhost = ghostStalls.length>0;
