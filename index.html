@@ -732,6 +732,14 @@ function saveAll(){
 // псевдо-savers, всё идёт через saveAll
 const saveStalls=saveAll, savePassages=saveAll, saveConfig=saveAll, saveFlows=saveAll;
 
+// вызывается из Electron main при старте — загружает внемапные прилавки
+window.loadExtraStalls = function(arr){
+  if(!Array.isArray(arr)) return;
+  extraStalls.length = 0;
+  arr.forEach(s => extraStalls.push(s));
+  try{ localStorage.setItem(EXTRA_STALLS_KEY, JSON.stringify(arr)); }catch(e){}
+};
+
 // миграция: у прилавков без x/y — посчитать позиции
 function migrateStallPositions(){
   let changed=false;
