@@ -2888,12 +2888,21 @@ function buildReportHTML(){
   }
   const catSorted = Object.entries(catMap).sort((a,b)=>b[1].count-a[1].count);
 
-  // По корпусам
+  // По корпусам (ключ = этаж::id, отображается метка корпуса)
   const bldMap = {};
-  for(const fl of floors)
+  const bldLabel = {}; // key → отображаемое имя
+  for(const fl of floors){
+    const bldDefs = fl.buildings || [];
     for(const s of Object.values(fl.stalls)){
-      const key = s.building||'X';
-      if(!bldMap[key]) bldMap[key]={count:0,filled:0,rentPlan:0,rentFact:0,area:0,rents:[]};
+      const bid = s.building||'X';
+      // уникальный ключ: если одинаковый id на разных этажах — добавляем этаж
+      const def = bldDefs.find(b=>b.id===bid);
+      const lbl = def && def.label ? def.label : bid;
+      // если такой ключ уже есть с другим этажом — уточняем
+      let key = lbl;
+      if(bldLabel[key] && bldLabel[key]._floor && bldLabel[key]._floor !== fl.name)
+        key = fl.name + ' / ' + lbl;
+      if(!bldMap[key]){ bldMap[key]={count:0,filled:0,rentPlan:0,rentFact:0,area:0,rents:[]}; bldLabel[key]={_floor:fl.name}; }
       bldMap[key].count++;
       if(s.tenant||s.importance) bldMap[key].filled++;
       bldMap[key].rentPlan+=num(s.rent);
@@ -2901,6 +2910,7 @@ function buildReportHTML(){
       bldMap[key].area    +=num(s.area);
       if(num(s.rent)>0) bldMap[key].rents.push({id:s.id||'', r:num(s.rent), t:s.tenant||''});
     }
+  }
   const bldKeys  = Object.keys(bldMap);
   const bldPlans = bldKeys.map(k=>bldMap[k].rentPlan);
   const bldFacts = bldKeys.map(k=>bldMap[k].rentFact);
